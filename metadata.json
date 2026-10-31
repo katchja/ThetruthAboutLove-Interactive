@@ -1,0 +1,10 @@
+{
+  "name": "The Truth About Love",
+  "description": "A conversational manuscript, archive, and notebook for 'The Truth About Love' by Catalina Butnaru. Exploring love as a fundamental life force, unprogrammable self-love, healthy romantic love, the love of humanity, and more. at the intersection of information theory, philosophy, depth psychology, and cognitive science. ",
+  "requestFramePermissions": [
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
