@@ -21,6 +21,9 @@ import {
   Trash2,
   Pencil,
   ImagePlus,
+  CloudUpload,
+  CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import {
   Source,
@@ -44,6 +47,13 @@ interface ArchivePageViewProps {
   isStudioAdmin?: boolean;
   totalVectorChunks: number;
   onReturnHome?: () => void;
+  onPublishToPublic?: () => Promise<void> | void;
+  syncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
+  syncedStats?: {
+    totalSources: number;
+    photoCount: number;
+    citationCount: number;
+  };
 }
 
 const TYPE_CONFIG: Record<
@@ -106,6 +116,9 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
   isStudioAdmin = false,
   totalVectorChunks,
   onReturnHome,
+  onPublishToPublic,
+  syncStatus = 'idle',
+  syncedStats,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
@@ -298,6 +311,41 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                 <Download className="w-4 h-4 text-[#8C7A7D]" />
                 <span>Export Bibliography</span>
               </button>
+
+              {isStudioAdmin && onPublishToPublic && (
+                <button
+                  type="button"
+                  onClick={() => onPublishToPublic()}
+                  disabled={syncStatus === 'syncing'}
+                  className={`px-4 py-2.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-1.5 shadow-sm border ${
+                    syncStatus === 'synced'
+                      ? 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
+                      : syncStatus === 'error'
+                      ? 'bg-rose-50 border-rose-200 text-rose-800 hover:bg-rose-100'
+                      : 'bg-[#241B1C] border-[#241B1C] text-white hover:bg-[#3B2B2E]'
+                  }`}
+                  title="Sync all Studio photos, cards, and Bibliographic & Citation Index entries to the public link"
+                >
+                  {syncStatus === 'syncing' ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#FF2A6D]" />
+                      <span>Publishing to Public...</span>
+                    </>
+                  ) : syncStatus === 'synced' ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>
+                        Published ({syncedStats?.photoCount ?? 0} Photos · {syncedStats?.citationCount ?? referenceSources.length} Citations)
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <CloudUpload className="w-3.5 h-3.5 text-[#FF2A6D]" />
+                      <span>Publish to Public</span>
+                    </>
+                  )}
+                </button>
+              )}
 
               {isStudioAdmin && onOpenAddSource && (
                 <button
@@ -715,10 +763,26 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
               </p>
             </div>
 
-            <div className="flex items-center gap-3 self-start sm:self-auto">
+            <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
               <span className="text-xs font-mono text-[#8C7A7D]">
                 {referenceSources.length} {referenceSources.length === 1 ? 'Citation' : 'Citations'}
               </span>
+              {isStudioAdmin && onPublishToPublic && (
+                <button
+                  type="button"
+                  onClick={() => onPublishToPublic()}
+                  disabled={syncStatus === 'syncing'}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#EAE1D9] bg-[#FDFCFA] hover:border-[#FF2A6D] text-[#241B1C] text-xs font-medium transition-colors shadow-xs"
+                  title="Sync all citations and photos to the public app"
+                >
+                  {syncStatus === 'syncing' ? (
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#FF2A6D]" />
+                  ) : (
+                    <CloudUpload className="w-3.5 h-3.5 text-[#FF2A6D]" />
+                  )}
+                  <span>Sync Citations to Public</span>
+                </button>
+              )}
               {isStudioAdmin && onOpenAddSource && (
                 <button
                   type="button"

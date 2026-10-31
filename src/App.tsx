@@ -21,6 +21,7 @@ import {
   SearchResult,
   ChatModelTier,
   getSourceImages,
+  getSourceSection,
 } from './types';
 import { defaultBookMetadata, seedSources } from './data/seedData';
 import {
@@ -161,6 +162,109 @@ export default function App() {
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1');
 
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [syncedStats, setSyncedStats] = useState<{
+    totalSources: number;
+    photoCount: number;
+    citationCount: number;
+  }>({
+    totalSources: 0,
+    photoCount: 0,
+    citationCount: 0,
+  });
+
+  const getAdminHeaders = () => ({
+    'Content-Type': 'application/json',
+    'x-studio-admin': 'true',
+    'x-studio-author': 'true',
+    'x-client-hostname':
+      typeof window !== 'undefined' ? window.location.hostname : '',
+  });
+
+  const computeLocalStats = (list: Source[]) => {
+    let photoCount = 0;
+    let citationCount = 0;
+    for (const s of list) {
+      const imgs = getSourceImages(s);
+      photoCount += imgs.length;
+      if (getSourceSection(s) === 'references') {
+        citationCount += 1;
+      }
+    }
+    return {
+      totalSources: list.length,
+      photoCount,
+      citationCount,
+    };
+  };
+
+  /**
+   * Publishes all Studio sources, bibliographic citations, and card photos to the backend
+   * so they are immediately visible on the public shared link (ais-pre-*).
+   * Splits large base64 photos into per-card requests to avoid Cloud Run proxy body size limits.
+   */
+  const publishArchiveToPublic = async (
+    customSources?: Source[],
+    customDeletedIds?: string[],
+    customMetadata?: BookMetadata
+  ) => {
+    if (!isStudioBuildMode) return;
+    const targetSources = customSources || sources;
+    const targetDeleted = customDeletedIds || Array.from(getDeletedSourceIds());
+    const targetMetadata = customMetadata || bookMetadata;
+
+    setSyncStatus('syncing');
+    try {
+      // Step 1: Sync all text, metadata, and Bibliographic & Citation Index entries first
+      // (omitting large data:image base64 strings in the bulk call so it never hits proxy limits)
+      const lightweightSources = targetSources.map((s) => {
+        const hasLargeDataUrl =
+          (s.imageUrl && s.imageUrl.startsWith('data:') && s.imageUrl.length > 60000) ||
+          (Array.isArray(s.images) &&
+            s.images.some((img) => img && img.startsWith('data:') && img.length > 60000));
+        if (!hasLargeDataUrl) return s;
+        return {
+          ...s,
+          imageUrl:
+            s.imageUrl && !s.imageUrl.startsWith('data:') ? s.imageUrl : undefined,
+          images: undefined,
+        };
+      });
+
+      const syncRes = await fetch('/api/archive/sync', {
+        method: 'POST',
+        headers: getAdminHeaders(),
+        body: JSON.stringify({
+          sources: lightweightSources,
+          deletedIds: targetDeleted,
+          bookMetadata: targetMetadata,
+        }),
+      });
+
+      if (!syncRes.ok) {
+        throw new Error(`Sync failed with status ${syncRes.status}`);
+      }
+
+      // Step 2: Sync each source that has attached photos individually so every high-res photo persists
+      const sourcesWithPhotos = targetSources.filter(
+        (s) => getSourceImages(s).length > 0
+      );
+      for (const photoSource of sourcesWithPhotos) {
+        await fetch('/api/archive/source', {
+          method: 'POST',
+          headers: getAdminHeaders(),
+          body: JSON.stringify({ source: photoSource }),
+        });
+      }
+
+      setSyncedStats(computeLocalStats(targetSources));
+      setSyncStatus('synced');
+    } catch (err) {
+      console.warn('Studio archive publish notice:', err);
+      setSyncStatus('error');
+    }
+  };
+
   const handleSaveVoiceSettings = (updated: VoiceSettings) => {
     setVoiceSettings(updated);
     try {
@@ -173,13 +277,14 @@ export default function App() {
     async function init() {
       setIsLoadingArchive(true);
       try {
-        // Fetch canonical server archive (readable by everyone so all visitors see pictures & edits)
+        // Fetch canonical server archive (readable by everyone so all visitors see pictures & citations)
         let serverSources: Source[] = [];
         let serverDeletedIds: string[] = [];
         let serverMetadata: BookMetadata | undefined;
 
         try {
-          const res = await fetch('/api/archive', {
+          const res = await fetch(`/api/archive?t=${Date.now()}`, {
+            cache: 'no-store',
             headers: { Accept: 'application/json' },
           });
           if (res.ok) {
@@ -191,7 +296,27 @@ export default function App() {
             }
           }
         } catch (fetchErr) {
-          console.warn('Server archive fetch fallback:', fetchErr);
+          console.warn('Server /api/archive fetch fallback:', fetchErr);
+        }
+
+        // Fallback to static /archive-store.json if needed
+        if (serverSources.length === 0) {
+          try {
+            const staticRes = await fetch(`/archive-store.json?t=${Date.now()}`, {
+              cache: 'no-store',
+              headers: { Accept: 'application/json' },
+            });
+            if (staticRes.ok) {
+              const staticData = await staticRes.json();
+              if (Array.isArray(staticData?.sources)) serverSources = staticData.sources;
+              if (Array.isArray(staticData?.deletedIds)) {
+                serverDeletedIds = staticData.deletedIds;
+              }
+              if (staticData?.bookMetadata && typeof staticData.bookMetadata === 'object') {
+                serverMetadata = staticData.bookMetadata;
+              }
+            }
+          } catch {}
         }
 
         if (serverMetadata) {
@@ -218,12 +343,24 @@ export default function App() {
         for (const srv of serverSources) {
           if (srv && srv.id && !combinedDeleted.has(srv.id) && !isPurgedArchiveSource(srv)) {
             const existing = byId.get(srv.id);
-            byId.set(srv.id, existing ? { ...existing, ...srv } : srv);
+            if (!existing) {
+              byId.set(srv.id, srv);
+            } else {
+              const srvImages = getSourceImages(srv);
+              const exImages = getSourceImages(existing);
+              const mergedImages = srvImages.length > 0 ? srvImages : exImages;
+              byId.set(srv.id, {
+                ...existing,
+                ...srv,
+                imageUrl: mergedImages[0] || srv.imageUrl || existing.imageUrl,
+                images: mergedImages.length > 0 ? mergedImages : undefined,
+              });
+            }
           }
         }
 
-        // If the author is in Google AI Studio Build mode, merge any pictures/edits from her browser IndexedDB
-        // and immediately push them to the server so they become visible to everyone!
+        // If the author is in Google AI Studio Build mode, merge all pictures, edits, and citations from her browser IndexedDB
+        // and immediately publish them to the server so they are live on the public app!
         if (isStudioBuildMode && stored.sources.length > 0) {
           for (const loc of stored.sources) {
             if (!loc || !loc.id || combinedDeleted.has(loc.id) || isPurgedArchiveSource(loc)) {
@@ -233,18 +370,24 @@ export default function App() {
             if (!current) {
               byId.set(loc.id, loc);
             } else {
-              const locImgCount = getSourceImages(loc).length;
-              const curImgCount = getSourceImages(current).length;
+              const locImages = getSourceImages(loc);
+              const curImages = getSourceImages(current);
+              const mergedImages = locImages.length > 0 ? locImages : curImages;
               const locTime = loc.updatedAt || loc.createdAt || 0;
               const curTime = current.updatedAt || current.createdAt || 0;
 
-              if (locTime >= curTime || locImgCount > curImgCount) {
-                const mergedImages =
-                  locImgCount > 0 ? getSourceImages(loc) : getSourceImages(current);
+              if (locTime >= curTime || locImages.length >= curImages.length) {
                 byId.set(loc.id, {
                   ...current,
                   ...loc,
                   imageUrl: mergedImages[0] || loc.imageUrl || current.imageUrl,
+                  images: mergedImages.length > 0 ? mergedImages : undefined,
+                });
+              } else {
+                byId.set(loc.id, {
+                  ...loc,
+                  ...current,
+                  imageUrl: mergedImages[0] || current.imageUrl || loc.imageUrl,
                   images: mergedImages.length > 0 ? mergedImages : undefined,
                 });
               }
@@ -253,26 +396,6 @@ export default function App() {
         }
 
         const finalSources = Array.from(byId.values());
-
-        // If in Google AI Studio Build mode, sync the canonical merged set to the backend server
-        if (isStudioBuildMode) {
-          try {
-            await fetch('/api/archive/sync', {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'x-studio-admin': 'true',
-              },
-              body: JSON.stringify({
-                sources: finalSources,
-                deletedIds: Array.from(combinedDeleted),
-                bookMetadata: serverMetadata || bookMetadata,
-              }),
-            });
-          } catch (syncErr) {
-            console.warn('Studio archive sync notice:', syncErr);
-          }
-        }
 
         // Index all canonical sources into local vector chunks
         const allIndexedChunks: VectorChunk[] = [];
@@ -284,6 +407,16 @@ export default function App() {
         setSources(finalSources);
         setVectorChunks(allIndexedChunks);
         setSelectedSourceIds(finalSources.map((s) => s.id));
+        setSyncedStats(computeLocalStats(finalSources));
+
+        // If in Google AI Studio Build mode, auto-publish the merged set to the backend server
+        if (isStudioBuildMode) {
+          await publishArchiveToPublic(
+            finalSources,
+            Array.from(combinedDeleted),
+            serverMetadata || bookMetadata
+          );
+        }
       } catch (err) {
         console.warn('Archive initialization fallback:', err);
         const deletedSet = getDeletedSourceIds();
@@ -305,21 +438,27 @@ export default function App() {
       updatedAt: Date.now(),
     };
     const chunks = await indexSource(enriched);
-    setSources((prev) => [enriched, ...prev]);
+    const nextSources = [enriched, ...sources];
+    setSources(nextSources);
     setVectorChunks((prev) => [...chunks, ...prev]);
     setSelectedSourceIds((prev) => [enriched.id, ...prev]);
 
+    setSyncStatus('syncing');
     try {
-      await fetch('/api/archive/source', {
+      const res = await fetch('/api/archive/source', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-studio-admin': 'true',
-        },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ source: enriched }),
       });
+      if (res.ok) {
+        setSyncedStats(computeLocalStats(nextSources));
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('error');
+      }
     } catch (err) {
       console.warn('Failed to persist new source to server:', err);
+      setSyncStatus('error');
     }
   };
 
@@ -331,9 +470,10 @@ export default function App() {
       updatedAt: Date.now(),
     };
     const newChunks = await indexSource(enriched);
-    setSources((prev) =>
-      prev.map((s) => (s.id === enriched.id ? enriched : s))
+    const nextSources = sources.map((s) =>
+      s.id === enriched.id ? enriched : s
     );
+    setSources(nextSources);
     setVectorChunks((prev) => [
       ...prev.filter((c) => c.sourceId !== enriched.id),
       ...newChunks,
@@ -342,17 +482,22 @@ export default function App() {
       prev && prev.id === enriched.id ? enriched : prev
     );
 
+    setSyncStatus('syncing');
     try {
-      await fetch('/api/archive/source', {
+      const res = await fetch('/api/archive/source', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-studio-admin': 'true',
-        },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ source: enriched }),
       });
+      if (res.ok) {
+        setSyncedStats(computeLocalStats(nextSources));
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('error');
+      }
     } catch (err) {
       console.warn('Failed to persist updated source to server:', err);
+      setSyncStatus('error');
     }
   };
 
@@ -382,21 +527,28 @@ export default function App() {
   const handleDeleteSource = async (id: string) => {
     if (!isStudioBuildMode) return;
     await removeSourceFromDB(id, true);
-    setSources((prev) => prev.filter((s) => s.id !== id));
+    const nextSources = sources.filter((s) => s.id !== id);
+    setSources(nextSources);
     setVectorChunks((prev) => prev.filter((c) => c.sourceId !== id));
     setSelectedSourceIds((prev) => prev.filter((itemId) => itemId !== id));
     setActiveSourceDetail((prev) => (prev && prev.id === id ? null : prev));
     setEditingSource((prev) => (prev && prev.id === id ? null : prev));
 
+    setSyncStatus('syncing');
     try {
-      await fetch(`/api/archive/source/${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/archive/source/${encodeURIComponent(id)}`, {
         method: 'DELETE',
-        headers: {
-          'x-studio-admin': 'true',
-        },
+        headers: getAdminHeaders(),
       });
+      if (res.ok) {
+        setSyncedStats(computeLocalStats(nextSources));
+        setSyncStatus('synced');
+      } else {
+        setSyncStatus('error');
+      }
     } catch (err) {
       console.warn('Failed to delete source on server:', err);
+      setSyncStatus('error');
     }
   };
 
@@ -406,10 +558,7 @@ export default function App() {
     try {
       await fetch('/api/archive/metadata', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-studio-admin': 'true',
-        },
+        headers: getAdminHeaders(),
         body: JSON.stringify({ bookMetadata: newMetadata }),
       });
     } catch (err) {
@@ -430,21 +579,7 @@ export default function App() {
     setSources(seedSources);
     setVectorChunks(allIndexedChunks);
     setSelectedSourceIds(seedSources.map((s) => s.id));
-
-    try {
-      await fetch('/api/archive/sync', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-studio-admin': 'true',
-        },
-        body: JSON.stringify({
-          sources: seedSources,
-          deletedIds: [],
-          bookMetadata: defaultBookMetadata,
-        }),
-      });
-    } catch {}
+    await publishArchiveToPublic(seedSources, [], defaultBookMetadata);
   };
 
   // Core Conversational Query Handler
@@ -624,6 +759,11 @@ export default function App() {
         totalSourcesCount={sources.length}
         totalChunksCount={vectorChunks.length}
         onOpenChatPopup={() => setIsChatPopupOpen(true)}
+        onPublishToPublic={
+          isStudioBuildMode ? () => publishArchiveToPublic() : undefined
+        }
+        syncStatus={syncStatus}
+        syncedStats={syncedStats}
       />
 
       {/* VIEW: Dedicated References & Archive Repository Page */}
@@ -662,6 +802,11 @@ export default function App() {
             setCurrentView('landing');
             window.scrollTo({ top: 0, behavior: 'smooth' });
           }}
+          onPublishToPublic={
+            isStudioBuildMode ? () => publishArchiveToPublic() : undefined
+          }
+          syncStatus={syncStatus}
+          syncedStats={syncedStats}
         />
       )}
 

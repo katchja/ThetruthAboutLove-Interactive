@@ -49,6 +49,8 @@ function createManuscriptSvgDataUri(title: string, date: string, lines: string[]
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
 
+const SEED_BASE_TIME = 1704067200000;
+
 export const seedSources: Source[] = [
   {
     id: 'src-manifesto',
@@ -71,7 +73,7 @@ To preserve the power of love, and to live a life to the highest standard, here'
 This manifesto is for you, fierce lovers!`,
     tags: ['Manifesto', 'Life Force', '2030 Horizon', 'Synthetic AI Lovers', 'Fierce Lovers'],
     isProtected: false,
-    createdAt: Date.now() - 86400000 * 7,
+    createdAt: SEED_BASE_TIME - 86400000 * 7,
   },
   {
     id: 'src-ch1',
@@ -106,7 +108,7 @@ Love itself is always restorative.
 It is the pure current of life.`,
     tags: ['Life Force', 'Consciousness', 'Epistemology', 'Truth of Love'],
     isProtected: true,
-    createdAt: Date.now() - 86400000 * 6,
+    createdAt: SEED_BASE_TIME - 86400000 * 6,
   },
   {
     id: 'src-ch2',
@@ -139,7 +141,7 @@ It makes old dogmas easy to surrender.
 Through love, consciousness evolves through meaning-making, not blind selection.`,
     tags: ['Adjacent Possible', 'Markov Blanket', 'Evolution', 'Meaning'],
     isProtected: true,
-    createdAt: Date.now() - 86400000 * 5,
+    createdAt: SEED_BASE_TIME - 86400000 * 5,
   },
   {
     id: 'src-ch3',
@@ -175,7 +177,7 @@ It is not consumption.
 It is generative life force.`,
     tags: ['Self-Love', 'Commodification', 'Dark Patterns', 'Unprogrammable Self'],
     isProtected: true,
-    createdAt: Date.now() - 86400000 * 4,
+    createdAt: SEED_BASE_TIME - 86400000 * 4,
   },
   {
     id: 'src-ch4',
@@ -209,7 +211,7 @@ It is power shared within love, not power over another.
 It is mutual empowerment without surrender of self.`,
     tags: ['Romantic Love', 'Projections', 'Relational Sovereignty', 'Archetypes'],
     isProtected: true,
-    createdAt: Date.now() - 86400000 * 3,
+    createdAt: SEED_BASE_TIME - 86400000 * 3,
   },
   {
     id: 'src-ch5',
@@ -241,7 +243,7 @@ Every time you forgive, you expand your consciousness.
 To love these victories is to love life itself.`,
     tags: ['Love of Life', 'Change', 'Surrender', 'Expansion'],
     isProtected: true,
-    createdAt: Date.now() - 86400000 * 2,
+    createdAt: SEED_BASE_TIME - 86400000 * 2,
   },
   {
     id: 'src-ch6',
@@ -272,7 +274,7 @@ Love of humanity is not a moral checklist.
 It is the courage to celebrate the full freedom of being human.`,
     tags: ['Love of Humanity', 'Belonging', 'Freedom', 'Authenticity'],
     isProtected: true,
-    createdAt: Date.now() - 86400000 * 1.5,
+    createdAt: SEED_BASE_TIME - 86400000 * 1.5,
   },
   {
     id: 'src-ch7',
@@ -305,7 +307,7 @@ Love is the unifying field.
 Love is the ultimate power.`,
     tags: ['Divine Love', 'The Numinous', 'Unifying Field', 'Transcendence'],
     isProtected: true,
-    createdAt: Date.now() - 86400000 * 1,
+    createdAt: SEED_BASE_TIME - 86400000 * 1,
   },
   {
     id: 'src-substack-self-love',
@@ -339,7 +341,7 @@ To reclaim self-love is to declare cognitive and emotional sovereignty over your
     },
     tags: ['Self-Love', 'Substack', 'Syntropy', 'Anti-Commodification', 'Emotional Sovereignty'],
     isProtected: false,
-    createdAt: Date.now() - 86400000 * 2,
+    createdAt: SEED_BASE_TIME - 86400000 * 2,
   },
   {
     id: 'src-substack-ai-mind',
@@ -373,6 +375,6 @@ Defending the human mind is the defining love story of our era. It requires cogn
     },
     tags: ['AI and Mind', 'Substack', 'Cognitive Liberty', 'Forum Internum', 'Human Agency'],
     isProtected: false,
-    createdAt: Date.now() - 86400000 * 1,
+    createdAt: SEED_BASE_TIME - 86400000 * 1,
   },
 ];

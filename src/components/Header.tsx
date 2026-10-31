@@ -8,6 +8,9 @@ import {
   Search,
   Database,
   Archive,
+  CloudUpload,
+  CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import { BookMetadata, AppView, VoiceSettings } from '../types';
 
@@ -25,6 +28,13 @@ interface HeaderProps {
   totalSourcesCount: number;
   totalChunksCount: number;
   onOpenChatPopup?: () => void;
+  onPublishToPublic?: () => void;
+  syncStatus?: 'idle' | 'syncing' | 'synced' | 'error';
+  syncedStats?: {
+    totalSources: number;
+    photoCount: number;
+    citationCount: number;
+  };
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -38,6 +48,9 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleSemanticSearch,
   isSemanticSearchOpen,
   onOpenChatPopup,
+  onPublishToPublic,
+  syncStatus = 'idle',
+  syncedStats,
 }) => {
   const embeddedVoiceId =
     voiceSettings?.voiceCloningKey &&
@@ -100,6 +113,46 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Action controls & Privacy mode */}
         <div className="flex items-center gap-2 shrink-0">
+          {/* Publish to Public button — visible only to the author in Google AI Studio Build mode */}
+          {onPublishToPublic && (
+            <button
+              onClick={onPublishToPublic}
+              disabled={syncStatus === 'syncing'}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all whitespace-nowrap ${
+                syncStatus === 'synced'
+                  ? 'bg-emerald-950/70 border-emerald-600/60 text-emerald-200 hover:bg-emerald-900/80'
+                  : syncStatus === 'error'
+                  ? 'bg-rose-950/80 border-rose-500 text-rose-200 hover:bg-rose-900'
+                  : 'bg-[#FF2A6D] border-[#FF2A6D] text-white hover:bg-[#E61556] shadow-sm shadow-[#FF2A6D]/30'
+              }`}
+              title={
+                syncedStats
+                  ? `Public Sync Active: ${syncedStats.photoCount} Photos & ${syncedStats.citationCount} Citations published to public link. Click to force publish.`
+                  : 'Publish all photos, edits, and citations from Studio to the public app'
+              }
+            >
+              {syncStatus === 'syncing' ? (
+                <>
+                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <span>Publishing...</span>
+                </>
+              ) : syncStatus === 'synced' ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="hidden xl:inline">
+                    Published ({syncedStats?.photoCount ?? 0} Photos · {syncedStats?.citationCount ?? 0} Citations)
+                  </span>
+                  <span className="xl:hidden">Published</span>
+                </>
+              ) : (
+                <>
+                  <CloudUpload className="w-3.5 h-3.5" />
+                  <span>Publish to Public</span>
+                </>
+              )}
+            </button>
+          )}
+
           {/* Semantic Search toggle */}
           <button
             onClick={onToggleSemanticSearch}

@@ -321,8 +321,82 @@ export function isPurgedArchiveSource(source: Partial<Source>): boolean {
   return PURGED_SOURCE_PATTERNS.some((pattern) => haystack.includes(pattern));
 }
 
+const LEGACY_DB_NAMES = [
+  'TruthAboutLove_LocalArchive_v4',
+  'TruthAboutLove_LocalArchive_v3',
+  'TruthAboutLove_LocalArchive_v2',
+  'TruthAboutLove_LocalArchive_v1',
+  'TruthAboutLove_LocalArchive',
+];
+
+function readLegacySourcesFromDBName(dbName: string): Promise<Source[]> {
+  return new Promise((resolve) => {
+    try {
+      const req = indexedDB.open(dbName);
+      req.onsuccess = () => {
+        const db = req.result;
+        if (!db.objectStoreNames.contains(SOURCES_STORE)) {
+          db.close();
+          resolve([]);
+          return;
+        }
+        try {
+          const tx = db.transaction([SOURCES_STORE], 'readonly');
+          const store = tx.objectStore(SOURCES_STORE);
+          const getAllReq = store.getAll();
+          getAllReq.onsuccess = () => {
+            const list = Array.isArray(getAllReq.result) ? getAllReq.result : [];
+            db.close();
+            resolve(list);
+          };
+          getAllReq.onerror = () => {
+            db.close();
+            resolve([]);
+          };
+        } catch {
+          db.close();
+          resolve([]);
+        }
+      };
+      req.onerror = () => resolve([]);
+    } catch {
+      resolve([]);
+    }
+  });
+}
+
+async function recoverLegacyIndexedDBSources(): Promise<Source[]> {
+  if (typeof indexedDB === 'undefined') return [];
+  const recovered: Source[] = [];
+  try {
+    let existingDbNames = new Set<string>(LEGACY_DB_NAMES);
+    if (typeof indexedDB.databases === 'function') {
+      const dbs = await indexedDB.databases();
+      const actualNames = new Set(
+        dbs.map((d) => d.name).filter((n): n is string => Boolean(n))
+      );
+      existingDbNames = new Set(
+        LEGACY_DB_NAMES.filter((name) => actualNames.has(name))
+      );
+    }
+
+    for (const legacyName of existingDbNames) {
+      const items = await readLegacySourcesFromDBName(legacyName);
+      for (const item of items) {
+        if (item && item.id) {
+          recovered.push(item);
+        }
+      }
+    }
+  } catch {
+    // Ignore errors on browsers that restrict indexedDB.databases()
+  }
+  return recovered;
+}
+
 /**
- * Load all stored sources and chunks from IndexedDB, automatically purging removed items
+ * Load all stored sources and chunks from IndexedDB, automatically recovering
+ * any legacy citations/photos and purging removed items
  */
 export async function loadArchiveFromDB(): Promise<{ sources: Source[]; chunks: VectorChunk[] }> {
   try {
@@ -348,15 +422,54 @@ export async function loadArchiveFromDB(): Promise<{ sources: Source[]; chunks: 
 
     const deletedSet = getDeletedSourceIds();
     const purgedIds = new Set<string>(deletedSet);
-    const validSources: Source[] = [];
+    const byId = new Map<string, Source>();
 
+    // 1. First load any legacy DB sources so v5 overrides or enriches them
+    const legacySources = await recoverLegacyIndexedDBSources();
+    for (const leg of legacySources) {
+      if (!leg || !leg.id || isPurgedArchiveSource(leg) || deletedSet.has(leg.id)) {
+        continue;
+      }
+      if (!byId.has(leg.id)) {
+        byId.set(leg.id, leg);
+      } else {
+        const cur = byId.get(leg.id)!;
+        const legImages = Array.isArray(leg.images) ? leg.images.filter(Boolean) : [];
+        const curImages = Array.isArray(cur.images) ? cur.images.filter(Boolean) : [];
+        const mergedImages = curImages.length > 0 ? curImages : legImages;
+        byId.set(leg.id, {
+          ...leg,
+          ...cur,
+          imageUrl: cur.imageUrl || leg.imageUrl || mergedImages[0],
+          images: mergedImages.length > 0 ? mergedImages : undefined,
+        });
+      }
+    }
+
+    // 2. Merge current v5 sources on top
     for (const source of raw.sources) {
       if (isPurgedArchiveSource(source) || deletedSet.has(source.id)) {
         purgedIds.add(source.id);
+        byId.delete(source.id);
       } else {
-        validSources.push(source);
+        const prev = byId.get(source.id);
+        if (!prev) {
+          byId.set(source.id, source);
+        } else {
+          const srcImages = Array.isArray(source.images) ? source.images.filter(Boolean) : [];
+          const prevImages = Array.isArray(prev.images) ? prev.images.filter(Boolean) : [];
+          const mergedImages = srcImages.length > 0 ? srcImages : prevImages;
+          byId.set(source.id, {
+            ...prev,
+            ...source,
+            imageUrl: source.imageUrl || prev.imageUrl || mergedImages[0],
+            images: mergedImages.length > 0 ? mergedImages : undefined,
+          });
+        }
       }
     }
+
+    const validSources = Array.from(byId.values());
 
     // Also check chunks whose sourceTitle matches purged pattern
     for (const chunk of raw.chunks) {

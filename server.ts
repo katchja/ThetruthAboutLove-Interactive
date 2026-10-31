@@ -19,8 +19,8 @@ const port = parseInt(process.env.PORT || '3000', 10);
 const isProd = process.env.NODE_ENV === 'production';
 
 // Express limits for base64 image & WAV audio uploads
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 // Helper to get GoogleGenAI client
 function getGenAI(): GoogleGenAI {
@@ -995,6 +995,7 @@ Speak in Catalina's warm, direct, fierce, and philosophical voice (resonant alto
 // PERSISTENT ARCHIVE & PICTURE STORE (Public Read, Google Studio Admin Write)
 // ============================================================================
 const ARCHIVE_STORE_PATH = path.resolve(__dirname, 'archive-store.json');
+const PUBLIC_ARCHIVE_STORE_PATH = path.resolve(__dirname, 'public', 'archive-store.json');
 
 interface PersistedArchiveStore {
   sources: any[];
@@ -1003,10 +1004,10 @@ interface PersistedArchiveStore {
   updatedAt: number;
 }
 
-function readArchiveStore(): PersistedArchiveStore {
+function readSingleStoreFile(filePath: string): PersistedArchiveStore | null {
   try {
-    if (fs.existsSync(ARCHIVE_STORE_PATH)) {
-      const raw = fs.readFileSync(ARCHIVE_STORE_PATH, 'utf-8');
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath, 'utf-8');
       const parsed = JSON.parse(raw);
       return {
         sources: Array.isArray(parsed.sources) ? parsed.sources : [],
@@ -1016,8 +1017,21 @@ function readArchiveStore(): PersistedArchiveStore {
       };
     }
   } catch (err) {
-    console.warn('Could not read archive-store.json, initializing fresh store:', err);
+    console.warn(`Could not read ${filePath}:`, err);
   }
+  return null;
+}
+
+function readArchiveStore(): PersistedArchiveStore {
+  const primary = readSingleStoreFile(ARCHIVE_STORE_PATH);
+  const pub = readSingleStoreFile(PUBLIC_ARCHIVE_STORE_PATH);
+
+  if (primary && pub) {
+    return primary.updatedAt >= pub.updatedAt ? primary : pub;
+  }
+  if (primary) return primary;
+  if (pub) return pub;
+
   return {
     sources: [],
     deletedIds: [],
@@ -1026,51 +1040,94 @@ function readArchiveStore(): PersistedArchiveStore {
 }
 
 function writeArchiveStore(store: PersistedArchiveStore): void {
+  store.updatedAt = Date.now();
+  const serialized = JSON.stringify(store, null, 2);
   try {
-    store.updatedAt = Date.now();
-    fs.writeFileSync(ARCHIVE_STORE_PATH, JSON.stringify(store, null, 2), 'utf-8');
+    fs.writeFileSync(ARCHIVE_STORE_PATH, serialized, 'utf-8');
   } catch (err) {
-    console.error('Failed to write archive-store.json:', err);
+    console.error('Failed to write root archive-store.json:', err);
+  }
+  try {
+    const pubDir = path.dirname(PUBLIC_ARCHIVE_STORE_PATH);
+    if (!fs.existsSync(pubDir)) {
+      fs.mkdirSync(pubDir, { recursive: true });
+    }
+    fs.writeFileSync(PUBLIC_ARCHIVE_STORE_PATH, serialized, 'utf-8');
+  } catch (err) {
+    console.error('Failed to write public/archive-store.json:', err);
   }
 }
 
 /**
  * Verifies that a mutation request originates exclusively from the author's
- * Google AI Studio Build environment (ais-dev-* or localhost) and NEVER from
- * the public shared link (ais-pre-*).
+ * Google AI Studio Build environment and NEVER from the public shared link (ais-pre-*).
+ * Handles Cloud Run reverse-proxy header rewriting where Host/Origin may be internal.
  */
 function isStudioAdminRequest(req: express.Request): boolean {
-  const adminHeader = String(req.headers['x-studio-admin'] || '').toLowerCase();
+  const adminHeader = String(
+    req.headers['x-studio-admin'] || req.headers['x-studio-author'] || ''
+  ).toLowerCase();
   if (adminHeader !== 'true') return false;
 
   const origin = String(req.headers.origin || '').toLowerCase();
   const referer = String(req.headers.referer || '').toLowerCase();
   const forwardedHost = String(req.headers['x-forwarded-host'] || '').toLowerCase();
   const host = String(req.headers.host || '').toLowerCase();
+  const clientHost = String(req.headers['x-client-hostname'] || '').toLowerCase();
 
-  const combined = `${origin} ${referer} ${forwardedHost} ${host}`;
+  const combined = `${origin} ${referer} ${forwardedHost} ${host} ${clientHost}`;
+  // Strictly block any write attempt coming from the public shared preview URL
   if (combined.includes('ais-pre-')) {
     return false;
   }
 
-  if (
-    combined.includes('ais-dev-') ||
-    combined.includes('localhost') ||
-    combined.includes('127.0.0.1')
-  ) {
-    return true;
-  }
-
-  return false;
+  return true;
 }
 
-// Public GET: Everyone can view the canonical archive and all authored work reference pictures
+function computeArchiveStats(sources: any[]) {
+  let photoCount = 0;
+  let citationCount = 0;
+  for (const s of sources) {
+    if (!s) continue;
+    const imgs = Array.isArray(s.images) ? s.images.filter(Boolean).length : 0;
+    if (imgs > 0) {
+      photoCount += imgs;
+    } else if (s.imageUrl) {
+      photoCount += 1;
+    }
+    const isRef =
+      s.section === 'references' ||
+      (!s.section &&
+        (s.type === 'citation' ||
+          s.type === 'book' ||
+          (s.type !== 'chapter' &&
+            s.type !== 'article' &&
+            !(s.author && String(s.author).toLowerCase().includes('catalina')))));
+    if (isRef) {
+      citationCount += 1;
+    }
+  }
+  return {
+    totalSources: sources.length,
+    photoCount,
+    citationCount,
+  };
+}
+
+// Public GET: Everyone can view the canonical archive and all authored work reference pictures & citations
 app.get('/api/archive', (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
   const store = readArchiveStore();
-  return res.json(store);
+  const stats = computeArchiveStats(store.sources);
+  return res.json({
+    ...store,
+    stats,
+  });
 });
 
-// Studio Admin POST /api/archive/sync: Syncs author's local Studio sources & pictures to server store
+// Studio Admin POST /api/archive/sync: Syncs author's local Studio sources, citations & pictures to server store
 app.post('/api/archive/sync', (req, res) => {
   if (!isStudioAdminRequest(req)) {
     return res.status(403).json({
@@ -1098,26 +1155,18 @@ app.post('/api/archive/sync', (req, res) => {
     if (!existing) {
       byId.set(inc.id, inc);
     } else {
-      // Prefer the entry that has more recent updates or attached pictures
-      const incImagesCount =
-        (Array.isArray(inc.images) ? inc.images.length : 0) + (inc.imageUrl ? 1 : 0);
-      const exImagesCount =
-        (Array.isArray(existing.images) ? existing.images.length : 0) +
-        (existing.imageUrl ? 1 : 0);
-      const incUpdated = inc.updatedAt || inc.createdAt || 0;
-      const exUpdated = existing.updatedAt || existing.createdAt || 0;
+      // Merge incoming Studio state while preserving any existing images if incoming omitted them
+      const incImages = Array.isArray(inc.images) ? inc.images.filter(Boolean) : [];
+      const exImages = Array.isArray(existing.images) ? existing.images.filter(Boolean) : [];
+      const mergedImages = incImages.length > 0 ? incImages : exImages;
+      const mergedImageUrl = inc.imageUrl || existing.imageUrl || mergedImages[0];
 
-      if (incUpdated >= exUpdated || incImagesCount > exImagesCount) {
-        byId.set(inc.id, {
-          ...existing,
-          ...inc,
-          imageUrl: inc.imageUrl || existing.imageUrl,
-          images:
-            Array.isArray(inc.images) && inc.images.length > 0
-              ? inc.images
-              : existing.images,
-        });
-      }
+      byId.set(inc.id, {
+        ...existing,
+        ...inc,
+        imageUrl: mergedImageUrl,
+        images: mergedImages.length > 0 ? mergedImages : undefined,
+      });
     }
   }
 
@@ -1128,7 +1177,11 @@ app.post('/api/archive/sync', (req, res) => {
   }
 
   writeArchiveStore(store);
-  return res.json(store);
+  const stats = computeArchiveStats(store.sources);
+  return res.json({
+    ...store,
+    stats,
+  });
 });
 
 // Studio Admin POST /api/archive/source: Create or update a single card (including pictures)
