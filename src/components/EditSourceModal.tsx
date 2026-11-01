@@ -275,7 +275,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
         <div className="px-6 py-4 border-b border-[#EAE1D9] flex items-center justify-between bg-[#FAF6F0]">
           <div>
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-[#FCECEF] text-[#9E3E50] border border-[#F3CBD2]">
+              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wider bg-[#FDF2EE] text-[#C83E0B] border border-[#F5D5C8]">
                 Author &amp; Admin Studio Editor
               </span>
             </div>
@@ -309,11 +309,11 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                   onClick={() => setSection('authored')}
                   className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 ${
                     section === 'authored'
-                      ? 'bg-[#FFF0F4] border-[#FF2A6D] text-[#241B1C] font-semibold shadow-2xs'
-                      : 'bg-[#FAF7F2] border-[#EAE1D9] text-[#635154] hover:border-[#C85A6E]/50'
+                      ? 'bg-[#FDF2EE] border-[#C83E0B] text-[#241B1C] font-semibold shadow-2xs'
+                      : 'bg-[#FAF7F2] border-[#EAE1D9] text-[#635154] hover:border-[#C83E0B]/50'
                   }`}
                 >
-                  <BookMarked className="w-4 h-4 text-[#FF2A6D] shrink-0" />
+                  <BookMarked className="w-4 h-4 text-[#C83E0B] shrink-0" />
                   <span className="text-xs truncate">Authored by Catalina</span>
                 </button>
                 <button
@@ -321,11 +321,11 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                   onClick={() => setSection('references')}
                   className={`p-2.5 rounded-xl border text-left transition-all flex items-center gap-2 ${
                     section === 'references'
-                      ? 'bg-[#FFF0F4] border-[#FF2A6D] text-[#241B1C] font-semibold shadow-2xs'
-                      : 'bg-[#FAF7F2] border-[#EAE1D9] text-[#635154] hover:border-[#C85A6E]/50'
+                      ? 'bg-[#FDF2EE] border-[#C83E0B] text-[#241B1C] font-semibold shadow-2xs'
+                      : 'bg-[#FAF7F2] border-[#EAE1D9] text-[#635154] hover:border-[#C83E0B]/50'
                   }`}
                 >
-                  <Quote className="w-4 h-4 text-[#FF2A6D] shrink-0" />
+                  <Quote className="w-4 h-4 text-[#C83E0B] shrink-0" />
                   <span className="text-xs truncate">References &amp; Quotes</span>
                 </button>
               </div>
@@ -344,7 +344,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                     setSection('references');
                   }
                 }}
-                className="w-full px-3 py-2.5 rounded-xl border border-[#E0D4CB] bg-[#FAF7F2] text-xs font-medium text-[#241B1C] focus:ring-1 focus:ring-[#FF2A6D] focus:border-[#FF2A6D]"
+                className="w-full px-3 py-2.5 rounded-xl border border-[#E0D4CB] bg-[#FAF7F2] text-xs font-medium text-[#241B1C] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               >
                 {SOURCE_TYPES.map((t) => (
                   <option key={t.id} value={t.id}>
@@ -367,7 +367,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Enter chapter, essay, scan, or quotation title..."
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#FF2A6D] focus:border-[#FF2A6D]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
 
@@ -380,7 +380,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                 value={reference}
                 onChange={(e) => setReference(e.target.value)}
                 placeholder="e.g. Chapter 3, pp. 45-62 or Substack Essay"
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#FF2A6D] focus:border-[#FF2A6D]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
           </div>
@@ -396,7 +396,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
                 placeholder="e.g. Catalina Butnaru"
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#FF2A6D] focus:border-[#FF2A6D]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
 
@@ -409,7 +409,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                 value={year}
                 onChange={(e) => setYear(e.target.value)}
                 placeholder="e.g. 2025"
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#FF2A6D] focus:border-[#FF2A6D]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
 
@@ -422,7 +422,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                 value={externalUrl}
                 onChange={(e) => setExternalUrl(e.target.value)}
                 placeholder="https://..."
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#FF2A6D] focus:border-[#FF2A6D]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
           </div>
@@ -432,7 +432,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
                 <h3 className="text-xs font-bold text-[#241B1C] flex items-center gap-1.5">
-                  <ImageIcon className="w-4 h-4 text-[#FF2A6D]" />
+                  <ImageIcon className="w-4 h-4 text-[#C83E0B]" />
                   <span>Card Pictures &amp; Archival Scans ({images.length})</span>
                 </h3>
                 <p className="text-[11px] text-[#8C7A7D]">
@@ -446,7 +446,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                     type="button"
                     onClick={handleRunOCROnPrimary}
                     disabled={isLoadingOCR}
-                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#F3CBD2] bg-[#FCECEF] text-[#9E3E50] hover:bg-[#F7D6DC] text-[11px] font-semibold transition-colors"
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#F5D5C8] bg-[#FDF2EE] text-[#C83E0B] hover:bg-[#F7DFD4] text-[11px] font-semibold transition-colors"
                   >
                     {isLoadingOCR ? (
                       <>
@@ -462,7 +462,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                   </button>
                 )}
 
-                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-semibold cursor-pointer shadow-xs transition-colors">
+                <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-semibold cursor-pointer shadow-xs transition-colors">
                   <Upload className="w-3.5 h-3.5" />
                   <span>Upload Picture(s)</span>
                   <input
@@ -483,15 +483,15 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                 value={newImageUrlInput}
                 onChange={(e) => setNewImageUrlInput(e.target.value)}
                 placeholder="Or paste an image URL / data URI..."
-                className="flex-1 px-3 py-1.5 rounded-lg border border-[#E0D4CB] bg-[#FDFCFA] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#FF2A6D]"
+                className="flex-1 px-3 py-1.5 rounded-lg border border-[#E0D4CB] bg-[#FDFCFA] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B]"
               />
               <button
                 type="button"
                 onClick={handleAddImageUrl}
                 disabled={!newImageUrlInput.trim()}
-                className="px-3 py-1.5 rounded-lg border border-[#EAE1D9] bg-[#FDFCFA] hover:border-[#FF2A6D] text-[#241B1C] disabled:opacity-40 text-xs font-medium flex items-center gap-1"
+                className="px-3 py-1.5 rounded-lg border border-[#EAE1D9] bg-[#FDFCFA] hover:border-[#C83E0B] text-[#241B1C] disabled:opacity-40 text-xs font-medium flex items-center gap-1"
               >
-                <Plus className="w-3.5 h-3.5 text-[#FF2A6D]" />
+                <Plus className="w-3.5 h-3.5 text-[#C83E0B]" />
                 <span>Add URL</span>
               </button>
             </div>
@@ -504,7 +504,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                     key={idx}
                     className={`relative group rounded-xl overflow-hidden border bg-[#FDFCFA] aspect-4/3 flex flex-col justify-between ${
                       idx === 0
-                        ? 'border-[#FF2A6D] ring-2 ring-[#FF2A6D]/25'
+                        ? 'border-[#C83E0B] ring-2 ring-[#C83E0B]/25'
                         : 'border-[#EAE1D9]'
                     }`}
                   >
@@ -515,7 +515,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                     />
                     <div className="absolute top-1.5 left-1.5">
                       {idx === 0 ? (
-                        <span className="px-2 py-0.5 rounded-md bg-[#FF2A6D] text-white text-[10px] font-semibold shadow-xs">
+                        <span className="px-2 py-0.5 rounded-md bg-[#C83E0B] text-white text-[10px] font-semibold shadow-xs">
                           Cover Picture
                         </span>
                       ) : (
@@ -530,7 +530,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                     </div>
                     <div className="absolute bottom-1.5 left-1.5 right-1.5 flex items-center justify-between gap-1">
                       <label
-                        className="px-2 py-0.5 rounded-md bg-[#241B1C]/85 hover:bg-[#FF2A6D] text-white text-[10px] font-medium cursor-pointer transition-colors flex items-center gap-1"
+                        className="px-2 py-0.5 rounded-md bg-[#241B1C]/85 hover:bg-[#C83E0B] text-white text-[10px] font-medium cursor-pointer transition-colors flex items-center gap-1"
                         title="Replace this picture"
                       >
                         <Upload className="w-2.5 h-2.5" />
@@ -545,7 +545,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                       <button
                         type="button"
                         onClick={() => handleRemoveImage(idx)}
-                        className="p-1 rounded-md bg-[#241B1C]/85 hover:bg-[#9E3E50] text-white transition-colors"
+                        className="p-1 rounded-md bg-[#241B1C]/85 hover:bg-[#C83E0B] text-white transition-colors"
                         title="Remove picture"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -567,7 +567,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
               placeholder="Distilled takeaway or featured quotation displayed on the archive card..."
-              className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] leading-relaxed focus:ring-1 focus:ring-[#FF2A6D] focus:border-[#FF2A6D]"
+              className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] leading-relaxed focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
             />
           </div>
 
@@ -587,15 +587,15 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
               value={content}
               onChange={(e) => setContent(e.target.value)}
               placeholder="Enter or edit the full passages, quotations, or manuscript text for this card..."
-              className="w-full px-3.5 py-2.5 rounded-xl border border-[#E0D4CB] bg-[#FAF7F2] text-xs font-serif-book text-[#2A2022] leading-relaxed focus:ring-1 focus:ring-[#FF2A6D] focus:border-[#FF2A6D]"
+              className="w-full px-3.5 py-2.5 rounded-xl border border-[#E0D4CB] bg-[#FAF7F2] text-xs font-serif-book text-[#2A2022] leading-relaxed focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
             />
           </div>
 
           {/* 7. Optional OCR Transcription Details (if scan or OCR present) */}
           {(type === 'scan' || Boolean(ocrTranscription) || Boolean(source.ocrData)) && (
-            <div className="p-4 rounded-xl bg-[#FAF2F4] border border-[#F3CBD2] space-y-3">
-              <div className="text-xs font-semibold text-[#7A2B3A] flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-[#C85A6E]" />
+            <div className="p-4 rounded-xl bg-[#FDF2EE] border border-[#F5D5C8] space-y-3">
+              <div className="text-xs font-semibold text-[#A93207] flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-[#C83E0B]" />
                 <span>OCR Transcription &amp; Specimen Metadata</span>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -650,13 +650,13 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                 value={tagsInput}
                 onChange={(e) => setTagsInput(e.target.value)}
                 placeholder="e.g. Love as Life Force, Syntropy, Fierce Lovers"
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#FF2A6D] focus:border-[#FF2A6D]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
 
             <div className="p-3 rounded-xl bg-[#FAF6F0] border border-[#EAE1D9] flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-[#C85A6E] shrink-0" />
+                <ShieldCheck className="w-4 h-4 text-[#C83E0B] shrink-0" />
                 <div>
                   <span className="text-xs font-semibold text-[#241B1C] block">
                     Protect Full Content (Privacy Shield)
@@ -670,7 +670,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                 type="checkbox"
                 checked={isProtected}
                 onChange={(e) => setIsProtected(e.target.checked)}
-                className="w-4 h-4 rounded text-[#FF2A6D] focus:ring-[#FF2A6D] border-[#E0D4CB] cursor-pointer accent-[#FF2A6D]"
+                className="w-4 h-4 rounded text-[#C83E0B] focus:ring-[#C83E0B] border-[#E0D4CB] cursor-pointer accent-[#C83E0B]"
               />
             </div>
           </div>
@@ -682,7 +682,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
             {onDeleteSource && (
               confirmDelete ? (
                 <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-[#9E3E50]">
+                  <span className="text-xs font-semibold text-[#C83E0B]">
                     Confirm permanent delete?
                   </span>
                   <button
@@ -691,7 +691,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                       await onDeleteSource(source.id);
                       onClose();
                     }}
-                    className="px-3 py-1.5 rounded-lg bg-[#9E3E50] hover:bg-[#7A2B3A] text-white text-xs font-semibold transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-semibold transition-colors"
                   >
                     Yes, Delete Card
                   </button>
@@ -707,7 +707,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                 <button
                   type="button"
                   onClick={() => setConfirmDelete(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#9E3E50] hover:bg-[#FCECEF] transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-[#C83E0B] hover:bg-[#FDF2EE] transition-colors"
                 >
                   <Trash2 className="w-3.5 h-3.5" />
                   <span>Delete Card</span>
@@ -728,7 +728,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
               type="button"
               onClick={handleSubmit}
               disabled={isSaving || !title.trim() || !content.trim()}
-              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#FF2A6D] hover:bg-[#E61556] disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-[#FF2A6D]/25 transition-colors"
+              className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#C83E0B] hover:bg-[#A93207] disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-[#C83E0B]/25 transition-colors"
             >
               {isSaving ? (
                 <>

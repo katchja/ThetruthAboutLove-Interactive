@@ -115,7 +115,7 @@ export const Header: React.FC<HeaderProps> = ({
                   ? 'bg-[#F1F3F4] text-[#0B0B0C] hover:bg-[#E8EAED]'
                   : syncStatus === 'error'
                   ? 'bg-[#202124] text-white hover:bg-[#0B0B0C]'
-                  : 'bg-[#FF2A6D] text-white hover:bg-[#E61556]'
+                  : 'bg-[#C83E0B] text-white hover:bg-[#A93207]'
               }`}
               title={
                 syncedStats
@@ -150,7 +150,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={onToggleSemanticSearch}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
               isSemanticSearchOpen
-                ? 'bg-[#FF2A6D] text-white'
+                ? 'bg-[#C83E0B] text-white'
                 : 'bg-[#F1F3F4] text-[#202124] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
             title="Search the archive"
@@ -164,7 +164,7 @@ export const Header: React.FC<HeaderProps> = ({
             onClick={() => setIsOfflineMode(!isOfflineMode)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
               isOfflineMode
-                ? 'bg-[#FF2A6D] text-white font-semibold'
+                ? 'bg-[#C83E0B] text-white font-semibold'
                 : 'bg-[#F1F3F4] text-[#202124] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
             title={

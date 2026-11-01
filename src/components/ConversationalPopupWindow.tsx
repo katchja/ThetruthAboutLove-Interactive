@@ -86,7 +86,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
       {!isOpen && (
         <button
           onClick={onToggle}
-          className="fixed bottom-5 right-5 z-40 px-5 py-3.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2.5 font-sans font-medium text-xs tracking-wide group cursor-pointer"
+          className="fixed bottom-5 right-5 z-40 px-5 py-3.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2.5 font-sans font-medium text-xs tracking-wide group cursor-pointer"
           title="Ask Manuscript"
         >
           <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
@@ -140,7 +140,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
 
               <button
                 onClick={onToggle}
-                className="p-1.5 rounded-full text-[#5F6368] hover:text-white hover:bg-[#FF2A6D] transition-colors cursor-pointer"
+                className="p-1.5 rounded-full text-[#5F6368] hover:text-white hover:bg-[#C83E0B] transition-colors cursor-pointer"
                 title="Close"
               >
                 <X className="w-4 h-4" />
@@ -156,7 +156,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                 onClick={() => onChangeChatModel('gemini-3.1-flash-lite')}
                 className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors whitespace-nowrap cursor-pointer ${
                   chatModel === 'gemini-3.1-flash-lite'
-                    ? 'bg-[#FF2A6D] text-white'
+                    ? 'bg-[#C83E0B] text-white'
                     : 'text-[#5F6368] hover:text-[#0B0B0C]'
                 }`}
                 title="Fast responses"
@@ -168,7 +168,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                 onClick={() => onChangeChatModel('gemini-3.8-flash')}
                 className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors whitespace-nowrap cursor-pointer ${
                   chatModel === 'gemini-3.8-flash'
-                    ? 'bg-[#FF2A6D] text-white'
+                    ? 'bg-[#C83E0B] text-white'
                     : 'text-[#5F6368] hover:text-[#0B0B0C]'
                 }`}
                 title="General"
@@ -180,7 +180,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                 onClick={() => onChangeChatModel('gemini-4-argon')}
                 className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors whitespace-nowrap cursor-pointer ${
                   chatModel === 'gemini-4-argon'
-                    ? 'bg-[#FF2A6D] text-white'
+                    ? 'bg-[#C83E0B] text-white'
                     : 'text-[#5F6368] hover:text-[#0B0B0C]'
                 }`}
                 title="Deep reasoning"
@@ -222,7 +222,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                       <button
                         key={idx}
                         onClick={() => handleSampleClick(q)}
-                        className="p-2.5 rounded-xl bg-[#FFFFFF] hover:bg-[#FF2A6D] text-xs text-[#0B0B0C] hover:text-white transition-all flex items-center justify-between group cursor-pointer"
+                        className="p-2.5 rounded-xl bg-[#FFFFFF] hover:bg-[#C83E0B] text-xs text-[#0B0B0C] hover:text-white transition-all flex items-center justify-between group cursor-pointer"
                       >
                         <span className="line-clamp-1">{q}</span>
                         <ArrowRight className="w-3 h-3 text-[#5F6368] group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
@@ -282,7 +282,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                                   );
                                   if (s && onSelectSource) onSelectSource(s);
                                 }}
-                                className="px-2.5 py-0.5 rounded-full bg-[#F1F3F4] text-[#0B0B0C] text-[10px] font-mono hover:bg-[#FF2A6D] hover:text-white transition-colors truncate max-w-[200px] cursor-pointer"
+                                className="px-2.5 py-0.5 rounded-full bg-[#F1F3F4] text-[#0B0B0C] text-[10px] font-mono hover:bg-[#C83E0B] hover:text-white transition-colors truncate max-w-[200px] cursor-pointer"
                                 title={`View ${c.sourceTitle}`}
                               >
                                 [{c.index}] {c.sourceTitle}
@@ -342,7 +342,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                   <button
                     type="submit"
                     disabled={isChatLoading}
-                    className="p-1.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white transition-colors cursor-pointer"
+                    className="p-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white transition-colors cursor-pointer"
                     title="Send message"
                   >
                     <Send className="w-3.5 h-3.5" />

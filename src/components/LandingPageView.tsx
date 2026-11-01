@@ -13,8 +13,9 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { BookMetadata, Source, ChatMessage, Citation, ChatModelTier, getSourceSection } from '../types';
-import bookCoverImg from '../assets/images/assets/aistudio/Cover_6f04220a.png';
 import { LabsFlowerShape, LabsCloudShape } from './LabsFloatingShapes';
+
+const BOOK_COVER_SRC = '/assets/aistudio/Book_cover_8c0e35cc.png';
 
 interface TruthQuoteItem {
   id: string;
@@ -175,32 +176,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
     'How do we navigate friction when our Self collides with Another?',
   ];
 
-  const guidedPrompts = [
-    {
-      title: 'Love as a Fundamental Life Force',
-      prompt: 'Why is love a fundamental life force rather than an emotion, and how does it expand the adjacent possible?',
-    },
-    {
-      title: 'Unprogrammable Self-Love vs. Market Traps',
-      prompt: 'Why is authentic self-love unprogrammable, and how do algorithms and the wellness market capture our instinct for expansion?'
-    },
-    {
-      title: 'Eros & Relational Sovereignty',
-      prompt: 'When my patterns and needs collide with another person in romantic love, what is needed instead of detachment or attachment theory labels?',
-    },
-    {
-      title: 'The Collision with Synthetic AI Lovers',
-      prompt: 'What is the 2030 collision between AI-generated thought, synthetic AI companions, and our authentic inner life?',
-    },
-    {
-      title: 'Meeting Unpredictable Change & Leaving Power Games',
-      prompt: 'How do we love life as unpredictable change and love humanity beyond social dominance and performative goodness?',
-    },
-    {
-      title: 'Personal Love Intelligence & Standards Exercise',
-      prompt: 'Guide me through a practical reflection exercise from the manuscript to evaluate my current love standards and reclaim emotional liberty.',
-    },
-  ];
 
   // Helper to render assistant markdown with interactive citation pills
   const renderMessageContent = (content: string, citations?: Citation[]) => {
@@ -225,7 +200,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   const target = sources.find((s) => s.id === sourceId) || sources[sourceIndex];
                   if (target) onSelectSource(target);
                 }}
-                className="inline-flex items-center gap-1 mx-1 px-2.5 py-0.5 rounded-md text-xs font-mono font-medium bg-[#FF2A6D] hover:bg-[#E61556] text-white transition-colors align-baseline cursor-pointer"
+                className="inline-flex items-center gap-1 mx-1 px-2.5 py-0.5 rounded-md text-xs font-mono font-medium bg-[#C83E0B] hover:bg-[#A93207] text-white transition-colors align-baseline cursor-pointer"
                 title={matchedCitation ? `Cited Source: ${matchedCitation.sourceTitle}` : 'View Citation in Archive'}
               >
                 <BookOpen className="w-3 h-3" />
@@ -310,7 +285,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               <button
                 type="button"
                 onClick={() => handleWhyShouldICare(currentTruth.quote)}
-                className="px-8 py-4 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white font-sans font-medium text-sm transition-all inline-flex items-center gap-3 cursor-pointer group"
+                className="px-8 py-4 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white font-sans font-medium text-sm transition-all inline-flex items-center gap-3 cursor-pointer group"
               >
                 <span>Ask Manuscript</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
@@ -353,7 +328,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                     onClick={() => onChangeChatModel('gemini-3.1-flash-lite')}
                     className={`px-4 py-2 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                       chatModel === 'gemini-3.1-flash-lite'
-                        ? 'bg-[#FF2A6D] text-white font-medium'
+                        ? 'bg-[#C83E0B] text-white font-medium'
                         : 'text-[#5F6368] hover:text-[#0B0B0C]'
                     }`}
                     title="Fast (gemini-3.1-flash-lite)"
@@ -365,7 +340,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                     onClick={() => onChangeChatModel('gemini-3.8-flash')}
                     className={`px-4 py-2 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                       chatModel === 'gemini-3.8-flash'
-                        ? 'bg-[#FF2A6D] text-white font-medium'
+                        ? 'bg-[#C83E0B] text-white font-medium'
                         : 'text-[#5F6368] hover:text-[#0B0B0C]'
                     }`}
                     title="Balanced (gemini-3.8-flash)"
@@ -377,7 +352,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                     onClick={() => onChangeChatModel('gemini-4-argon')}
                     className={`px-4 py-2 rounded-full transition-all whitespace-nowrap cursor-pointer ${
                       chatModel === 'gemini-4-argon'
-                        ? 'bg-[#FF2A6D] text-white font-medium'
+                        ? 'bg-[#C83E0B] text-white font-medium'
                         : 'text-[#5F6368] hover:text-[#0B0B0C]'
                     }`}
                     title="Deep reasoning (gemini-4-argon)"
@@ -389,7 +364,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 {messages.length > 0 && onClearChat && (
                   <button
                     onClick={onClearChat}
-                    className="px-4 py-2.5 text-xs font-medium text-white bg-[#FF2A6D] hover:bg-[#E61556] flex items-center gap-2 rounded-full transition-colors cursor-pointer"
+                    className="px-4 py-2.5 text-xs font-medium text-white bg-[#C83E0B] hover:bg-[#A93207] flex items-center gap-2 rounded-full transition-colors cursor-pointer"
                     title="Clear conversation and return to guided topics"
                   >
                     <RotateCcw className="w-3.5 h-3.5" />
@@ -449,7 +424,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   <button
                     type="submit"
                     disabled={!quickQuery.trim() || isChatLoading}
-                    className="px-7 py-3.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] disabled:opacity-50 disabled:hover:bg-[#FF2A6D] text-white font-medium text-sm transition-all flex items-center gap-2.5 cursor-pointer"
+                    className="px-7 py-3.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] disabled:opacity-50 disabled:hover:bg-[#C83E0B] text-white font-medium text-sm transition-all flex items-center gap-2.5 cursor-pointer"
                   >
                     {isChatLoading ? (
                       <>
@@ -471,7 +446,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono uppercase tracking-wider font-medium text-[#5F6368]">
-                  Instant questions — click any question to ask immediately:
+                  Instant prompts — click to chat with the Manuscript:
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -484,7 +459,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                       setQuickQuery('');
                       await onSendMessage(q);
                     }}
-                    className="px-4 py-2.5 rounded-full bg-[#FFFFFF] hover:bg-[#FF2A6D] text-[#202124] hover:text-white text-xs sm:text-sm font-sans font-medium transition-all flex items-center gap-2 text-left cursor-pointer group"
+                    className="px-4 py-2.5 rounded-full bg-[#FFFFFF] hover:bg-[#C83E0B] text-[#202124] hover:text-white text-xs sm:text-sm font-sans font-medium transition-all flex items-center gap-2 text-left cursor-pointer group"
                   >
                     <MessageSquare className="w-3.5 h-3.5 text-[#0B0B0C] group-hover:text-white shrink-0 transition-colors" />
                     <span>{q}</span>
@@ -494,76 +469,27 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             </div>
 
             {/* ==============================================================
-                CONVERSATION STAGE: Either Guided Dialogue Cards OR Live Thread
+                CONVERSATION STAGE: Live Thread
                 ============================================================== */}
-            {messages.length === 0 ? (
-              <div className="pt-6 space-y-8">
-                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
-                  <div className="space-y-2">
-                    <h3 className="text-lg sm:text-xl font-display font-normal text-[#0B0B0C]">
-                      Manuscript Prompts
-                    </h3>
-                    <p className="text-xs sm:text-sm text-[#5F6368] leading-relaxed font-sans">
-                      Start with a prompt below to launch the live chat with the Manuscript.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-7">
-                  {guidedPrompts.map((item, idx) => (
-                    <div
-                      key={idx}
-                      className="group rounded-3xl bg-[#FFFFFF] hover:bg-[#F1F3F4] p-6 sm:p-8 flex flex-col justify-between gap-6 transition-all"
-                    >
-                      <div className="space-y-4">
-                        <div className="flex items-center justify-between gap-2">
-                          <h4 className="text-base sm:text-lg font-display font-medium text-[#0B0B0C] leading-snug">
-                            {item.title}
-                          </h4>
-                          <Sparkles className="w-3.5 h-3.5 text-[#0B0B0C] opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
-                        </div>
-                        <p className="text-xs font-sans italic text-[#202124] bg-[#F8F9FA] p-4 rounded-2xl leading-relaxed">
-                          &ldquo;{item.prompt}&rdquo;
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between gap-3 pt-3">
-                        <button
-                          type="button"
-                          disabled={isChatLoading}
-                          onClick={async () => {
-                            setQuickQuery('');
-                            await onSendMessage(item.prompt);
-                          }}
-                          className="inline-flex items-center gap-2 px-4 py-2.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-medium transition-all cursor-pointer"
-                        >
-                          <span>Start Dialogue</span>
-                          <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
+            {messages.length > 0 && (
               <div className="space-y-6 pt-6">
                 <div className="flex items-center justify-between flex-wrap gap-3 text-xs text-[#5F6368]">
                   <div className="flex items-center gap-3">
                     <span className="font-medium text-sm text-[#0B0B0C] font-display">
-                      Chat with Manuscript ({messages.length} {messages.length === 1 ? 'exchange' : 'exchanges'})
+                      Chat({messages.length} {messages.length === 1 ? 'exchange' : 'exchanges'})
                     </span>
                     <span>·</span>
                     <span className="text-[#5F6368] font-sans">
-                      Click to inspect a note
+                      Click to open note
                     </span>
                   </div>
                   {onClearChat && (
                     <button
                       onClick={onClearChat}
-                      className="text-xs font-medium text-white bg-[#FF2A6D] hover:bg-[#E61556] px-3.5 py-1.5 rounded-full flex items-center gap-1.5 cursor-pointer transition-colors"
+                      className="text-xs font-medium text-white bg-[#C83E0B] hover:bg-[#A93207] px-3.5 py-1.5 rounded-full flex items-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <RotateCcw className="w-3 h-3" />
-                      <span>Return to Guided Topics</span>
+                      <span>Go back</span>
                     </button>
                   )}
                 </div>
@@ -587,7 +513,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                           <div className="flex items-center justify-between gap-3 mb-4 pb-3 text-xs text-[#5F6368]">
                             <div className="flex items-center gap-2.5 font-mono font-medium text-[#0B0B0C]">
                               <Sparkles className="w-4 h-4 text-[#0B0B0C]" />
-                              <span>Manuscript Response</span>
+                              <span>Manuscript Chat</span>
                             </div>
                             <span className="text-[11px] font-mono tabular-nums text-[#80868B]">
                               {new Date(message.timestamp).toLocaleTimeString([], {
@@ -611,7 +537,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                           message.citations.length > 0 && (
                             <div className="mt-5 pt-4 space-y-3">
                               <span className="text-xs font-mono uppercase tracking-wider font-medium text-[#5F6368] block">
-                                Grounded Manuscript Citations (click to open full archival record):
+                                Citations (click to open):
                               </span>
                               <div className="flex flex-wrap gap-2.5">
                                 {message.citations.map((c, idx) => (
@@ -622,7 +548,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                                       const target = sources.find((s) => s.id === c.sourceId);
                                       if (target) onSelectSource(target);
                                     }}
-                                    className="px-3.5 py-2 rounded-full bg-[#F1F3F4] hover:bg-[#FF2A6D] text-[#0B0B0C] hover:text-white text-xs font-mono font-medium transition-colors flex items-center gap-2 cursor-pointer"
+                                    className="px-3.5 py-2 rounded-full bg-[#F1F3F4] hover:bg-[#C83E0B] text-[#0B0B0C] hover:text-white text-xs font-mono font-medium transition-colors flex items-center gap-2 cursor-pointer"
                                   >
                                     <BookOpen className="w-3.5 h-3.5 text-current" />
                                     <span>[{c.index}] {c.sourceTitle}</span>
@@ -644,7 +570,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                                 className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#F1F3F4] transition-colors cursor-pointer"
                               >
                                 <MessageSquare className="w-3.5 h-3.5 text-current" />
-                                <span>Ask Follow-Up</span>
+                                <span>Follow-Up</span>
                               </button>
                             </div>
 
@@ -676,7 +602,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                       <div className="max-w-lg rounded-2xl p-6 bg-[#FFFFFF] space-y-3">
                         <div className="flex items-center gap-2.5 text-sm text-[#0B0B0C] font-medium font-sans">
                           <Sparkles className="w-4 h-4 animate-spin text-[#0B0B0C]" />
-                          <span>Searching manuscript vector index &amp; synthesizing response...</span>
+                          <span>Searching manuscript and archive...</span>
                         </div>
                         <div className="space-y-2.5">
                           <div className="h-3 bg-[#E8EAED] rounded w-64 animate-pulse" />
@@ -702,7 +628,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             <div className="lg:col-span-7 space-y-8">
               <div className="inline-flex items-center gap-2.5 text-xs font-mono font-medium uppercase tracking-wider text-[#5F6368] pb-1">
                 <Flame className="w-3.5 h-3.5 text-[#0B0B0C]" />
-                <span>The Truth About Love · Interactive Manuscript Edition</span>
+                <span>The Truth About Love · Interactive Manuscript</span>
               </div>
 
               <h1 className="text-3xl sm:text-4xl md:text-5xl font-display font-normal tracking-tight text-[#0B0B0C] leading-[1.15]">
@@ -710,20 +636,13 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               </h1>
 
               <p className="text-xl sm:text-2xl font-display font-normal text-[#202124] leading-snug">
-                Love is not an emotion. It is a fundamental life force.
+                This is an interactive manuscript and a book-in-the-making. Join me in my journey to write and discover the truth about love.
               </p>
-
               {/* Exact manifesto copy in brief, fierce sentences */}
               <div className="space-y-5 text-sm sm:text-base text-[#5F6368] leading-relaxed font-sans">
-                <p>
-                  You expand who you are and dissolve the distortions that make you less than: the power dynamics, the control disguised as deep connection, the programmatic content regulating your emotions, and the synthetic AI lovers.
-                </p>
-                <p>
-                  By 2030, inner life and love will collide with a changed collective reality, one where AI-generated thought takes more room than your truth. To preserve the power of love, and to live a life to the highest standard, here&apos;s a place to start.
-                </p>
                 <p className="pt-2 text-sm sm:text-base font-display font-medium text-[#0B0B0C] flex items-center gap-2.5">
                   <Flame className="w-4 h-4 text-[#0B0B0C] shrink-0" />
-                  <span>This manifesto is for you, fierce lovers!</span>
+                  <span>This book is for you, fierce lovers!</span>
                 </p>
               </div>
 
@@ -737,7 +656,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               <div className="flex flex-wrap items-center gap-4 pt-3">
                 <a
                   href="#conversational-archive"
-                  className="px-7 py-4 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white font-sans font-medium text-sm transition-all flex items-center gap-2.5"
+                  className="px-7 py-4 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white font-sans font-medium text-sm transition-all flex items-center gap-2.5"
                 >
                   <MessageSquare className="w-4 h-4" />
                   <span>Ask Manuscript</span>
@@ -768,8 +687,8 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   {/* Front Hardcover Board with Clearly Visible Unobstructed Cover */}
                   <div className="published-book-front">
                     <img
-                      src={bookCoverImg}
-                      alt="The Truth About Love In The Age of AI — By Catalina Butnaru"
+                      src={BOOK_COVER_SRC}
+                      alt="The Truth About Love — A memoir & manifesto for fierce lovers in the age of AI — By Catalina Butnaru"
                       className="w-full h-full object-cover block select-none"
                       draggable={false}
                     />
@@ -814,10 +733,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
             <div className="space-y-5 text-sm sm:text-base text-[#202124] leading-relaxed font-sans max-w-xl">
               <p>
-                You expand who you are and dissolve the distortions that make you less than: the power dynamics, the control disguised as deep connection, the programmatic content regulating your emotions, and the synthetic AI lovers.
+                It expands who you are and dissolves distortions: power dynamics, control disguised as connection, synthetic and programmatic content replacing your truth.
               </p>
               <p>
-                By 2030, inner life and love will collide with a changed collective reality, one where AI-generated thought takes more room than your truth. To preserve the power of love, and to live a life to the highest standard, here&apos;s a place to start.
+                To protect your truth and reclaim your power to love, here&apos;s a place to start.
               </p>
             </div>
 
@@ -957,7 +876,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                         "Guide me through the practical exercises to explore the truth of my love life, develop my love intelligence, and define my love standards."
                       );
                     }}
-                    className="mt-4 px-5 py-3 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-sans font-medium transition-all flex items-center justify-between group relative z-10 cursor-pointer"
+                    className="mt-4 px-5 py-3 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-sans font-medium transition-all flex items-center justify-between group relative z-10 cursor-pointer"
                   >
                     <span>Begin Practical Exercises</span>
                     <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition-transform" />
@@ -971,7 +890,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                         `Tell me about ${card.title} (${card.subtitle}) and the insights from ${card.tag}.`
                       );
                     }}
-                    className="self-start px-4 py-2.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-sans font-medium transition-all flex items-center gap-2 mt-2 group cursor-pointer"
+                    className="self-start px-4 py-2.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-sans font-medium transition-all flex items-center gap-2 mt-2 group cursor-pointer"
                   >
                     <MessageSquare className="w-3.5 h-3.5" />
                     <span>Talk to the manuscript</span>
@@ -1005,7 +924,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
             <button
               onClick={onOpenArchive}
-              className="px-7 py-4 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white font-sans font-medium text-sm transition-all flex items-center gap-2.5 shrink-0 self-start md:self-auto cursor-pointer"
+              className="px-7 py-4 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white font-sans font-medium text-sm transition-all flex items-center gap-2.5 shrink-0 self-start md:self-auto cursor-pointer"
             >
               <Archive className="w-4 h-4" />
               <span>Explore ({sources.length})</span>

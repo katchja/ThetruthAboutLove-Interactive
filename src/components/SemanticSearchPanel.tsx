@@ -106,7 +106,7 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
           <button
             type="submit"
             disabled={!query.trim() || isSearching}
-            className="px-5 py-2.5 rounded-xl bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            className="px-5 py-2.5 rounded-xl bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
             <span>Search</span>
             <Zap className="w-3.5 h-3.5" />
@@ -127,7 +127,7 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
                 }}
                 className={`px-2 py-0.5 rounded text-[11px] capitalize transition-colors ${
                   filterType === type
-                    ? 'bg-[#FF2A6D] text-white font-semibold'
+                    ? 'bg-[#C83E0B] text-white font-semibold'
                     : 'text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
                 }`}
               >
@@ -145,7 +145,7 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
                   setQuery(sample);
                   setTimeout(() => handleSearch(), 50);
                 }}
-                className="px-2 py-0.5 rounded bg-[#E8EAED] text-[#202124] text-[10px] hover:bg-[#FF2A6D] hover:text-white transition-colors shrink-0"
+                className="px-2 py-0.5 rounded bg-[#E8EAED] text-[#202124] text-[10px] hover:bg-[#C83E0B] hover:text-white transition-colors shrink-0"
               >
                 {sample}
               </button>
@@ -243,7 +243,7 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
 
                 <button
                   onClick={() => onAskAboutExcerpt(res.chunk.text, res.chunk.sourceTitle)}
-                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white font-medium transition-colors"
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white font-medium transition-colors"
                 >
                   <span>Ask Manuscript about this</span>
                   <ArrowRight className="w-3 h-3" />

@@ -280,7 +280,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                 {onReturnHome && (
                   <button
                     onClick={onReturnHome}
-                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#FF2A6D] hover:bg-[#E61556] text-white transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#C83E0B] hover:bg-[#A93207] text-white transition-colors cursor-pointer"
                     title="Return to Home: The Truth About Love"
                   >
                     <ArrowLeft className="w-3.5 h-3.5" />
@@ -325,7 +325,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                       ? 'bg-[#F1F3F4] text-[#0B0B0C] hover:bg-[#E8EAED]'
                       : syncStatus === 'error'
                       ? 'bg-[#202124] text-white'
-                      : 'bg-[#FF2A6D] text-white hover:bg-[#E61556]'
+                      : 'bg-[#C83E0B] text-white hover:bg-[#A93207]'
                   }`}
                   title="Sync all Studio photos, cards, and Bibliographic & Citation Index entries to the public link"
                 >
@@ -353,7 +353,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
               {isStudioAdmin && onOpenAddSource && (
                 <button
                   onClick={() => onOpenAddSource('authored')}
-                  className="px-4 py-2.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+                  className="px-4 py-2.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
                 >
                   <Plus className="w-4 h-4" />
                   <span>Add to Archive</span>
@@ -420,7 +420,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                   onClick={() => setSelectedType(tab.id)}
                   className={`px-3.5 py-1.5 rounded-full font-medium transition-all shrink-0 flex items-center gap-1.5 cursor-pointer ${
                     selectedType === tab.id
-                      ? 'bg-[#FF2A6D] text-white'
+                      ? 'bg-[#C83E0B] text-white'
                       : 'bg-[#F1F3F4] text-[#5F6368] hover:bg-[#E8EAED] hover:text-[#0B0B0C]'
                   }`}
                 >
@@ -468,7 +468,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onOpenAddSource('authored')}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-medium transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-medium transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Authored Work</span>
@@ -487,7 +487,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                   setSearchQuery('');
                   setSelectedType('all');
                 }}
-                className="px-4 py-2 rounded-full bg-[#FF2A6D] text-white text-xs font-medium cursor-pointer"
+                className="px-4 py-2 rounded-full bg-[#C83E0B] text-white text-xs font-medium cursor-pointer"
               >
                 Reset search &amp; filters
               </button>
@@ -718,7 +718,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                               href={source.externalUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-[11px] font-medium transition-all"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-[11px] font-medium transition-all"
                               title="Open publication link"
                             >
                               <span>
@@ -732,7 +732,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
 
                           <button
                             onClick={() => onAskAboutSourceInStudio(source)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-[11px] font-medium transition-colors cursor-pointer"
+                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-[11px] font-medium transition-colors cursor-pointer"
                             title="Ask questions about this reference in the conversational window"
                           >
                             <span>Ask Manuscript</span>
@@ -790,7 +790,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                 <button
                   type="button"
                   onClick={() => onOpenAddSource('references')}
-                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-medium transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-medium transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>Add Reference / Quotation</span>
@@ -817,7 +817,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                   <button
                     type="button"
                     onClick={() => onOpenAddSource('references')}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-medium transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-medium transition-colors cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>Add First Reference or Quotation</span>
@@ -927,7 +927,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                           href={source.externalUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-1 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white transition-colors flex items-center gap-1 font-medium"
+                          className="px-3 py-1 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white transition-colors flex items-center gap-1 font-medium"
                         >
                           <span>Source</span>
                           <ExternalLink className="w-3 h-3" />
@@ -936,7 +936,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
 
                       <button
                         onClick={() => onAskAboutSourceInStudio(source)}
-                        className="px-3 py-1 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
                       >
                         <span>Ask Manuscript</span>
                         <ArrowRight className="w-3 h-3" />

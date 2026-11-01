@@ -65,7 +65,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#EAE1D9] flex items-center justify-between bg-[#FAF6F0]">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-[#FCECEF] text-[#C85A6E] flex items-center justify-center">
+            <div className="w-8 h-8 rounded-lg bg-[#FDF2EE] text-[#C83E0B] flex items-center justify-center">
               <Settings className="w-4 h-4" />
             </div>
             <div>
@@ -96,7 +96,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
               required
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C85A6E] focus:border-[#C85A6E]"
+              className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
             />
           </div>
 
@@ -108,7 +108,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
               type="text"
               value={subtitle}
               onChange={(e) => setSubtitle(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C85A6E] focus:border-[#C85A6E]"
+              className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
             />
           </div>
 
@@ -122,7 +122,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
                 required
                 value={author}
                 onChange={(e) => setAuthor(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C85A6E] focus:border-[#C85A6E]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
             <div>
@@ -133,7 +133,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
                 type="text"
                 value={authorRole}
                 onChange={(e) => setAuthorRole(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C85A6E] focus:border-[#C85A6E]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
           </div>
@@ -146,7 +146,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C85A6E] focus:border-[#C85A6E] resize-none"
+              className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B] resize-none"
             />
           </div>
 
@@ -159,7 +159,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
                 type="text"
                 value={publisher}
                 onChange={(e) => setPublisher(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C85A6E] focus:border-[#C85A6E]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
             <div>
@@ -170,7 +170,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
                 type="text"
                 value={publicationYear}
                 onChange={(e) => setPublicationYear(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C85A6E] focus:border-[#C85A6E]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
             <div>
@@ -181,7 +181,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
                 type="text"
                 value={isbn}
                 onChange={(e) => setIsbn(e.target.value)}
-                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C85A6E] focus:border-[#C85A6E]"
+                className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
               />
             </div>
           </div>
@@ -195,7 +195,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
               value={purchaseUrl}
               onChange={(e) => setPurchaseUrl(e.target.value)}
               placeholder="https://books.google.com/... or https://amazon.com/..."
-              className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C85A6E] focus:border-[#C85A6E]"
+              className="w-full px-3 py-2 rounded-lg border border-[#E0D4CB] bg-[#FAF7F2] text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B] focus:border-[#C83E0B]"
             />
           </div>
 
@@ -208,7 +208,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
                   onClose();
                 }
               }}
-              className="text-[11px] text-[#8C7A7D] hover:text-[#C85A6E] flex items-center gap-1 transition-colors"
+              className="text-[11px] text-[#8C7A7D] hover:text-[#C83E0B] flex items-center gap-1 transition-colors"
             >
               <RotateCcw className="w-3 h-3" />
               <span>Reset to Default Edition</span>
@@ -228,7 +228,7 @@ export const BookSettingsModal: React.FC<BookSettingsModalProps> = ({
           <button
             type="button"
             onClick={handleSubmit}
-            className="px-5 py-2 rounded-xl bg-[#C85A6E] hover:bg-[#B34B5E] text-white text-xs font-medium shadow-sm transition-colors"
+            className="px-5 py-2 rounded-xl bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-medium shadow-sm transition-colors"
           >
             Save Settings
           </button>

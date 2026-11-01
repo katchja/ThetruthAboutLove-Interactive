@@ -125,7 +125,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
           <div className="flex items-center gap-1.5 shrink-0">
             {isStudioAdmin && onAddPicturesToSource && (
               <label
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#F1F3F4] hover:bg-[#FF2A6D] text-[#0B0B0C] hover:text-white text-xs font-medium cursor-pointer transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#F1F3F4] hover:bg-[#C83E0B] text-[#0B0B0C] hover:text-white text-xs font-medium cursor-pointer transition-colors"
                 title="Add Picture(s) to this Card"
               >
                 <ImagePlus className="w-3.5 h-3.5" />
@@ -144,7 +144,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
               <button
                 type="button"
                 onClick={() => onEditSource(source)}
-                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#F1F3F4] hover:bg-[#FF2A6D] text-[#0B0B0C] hover:text-white text-xs font-medium transition-colors"
+                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#F1F3F4] hover:bg-[#C83E0B] text-[#0B0B0C] hover:text-white text-xs font-medium transition-colors"
                 title="Edit Card Title, Passages, Author & Fields"
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -167,7 +167,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
             onClick={() => setActiveTab('summary')}
             className={`py-2 px-3 rounded-lg transition-colors ${
               activeTab === 'summary'
-                ? 'bg-[#FF2A6D] text-white font-semibold'
+                ? 'bg-[#C83E0B] text-white font-semibold'
                 : 'hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
           >
@@ -178,7 +178,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
               onClick={() => setActiveTab('ocr')}
               className={`py-2 px-3 rounded-lg transition-colors flex items-center gap-1.5 ${
                 activeTab === 'ocr'
-                  ? 'bg-[#FF2A6D] text-white font-semibold'
+                  ? 'bg-[#C83E0B] text-white font-semibold'
                   : 'hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
               }`}
             >
@@ -190,7 +190,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
             onClick={() => setActiveTab('raw')}
             className={`py-2 px-3 rounded-lg transition-colors ${
               activeTab === 'raw'
-                ? 'bg-[#FF2A6D] text-white font-semibold'
+                ? 'bg-[#C83E0B] text-white font-semibold'
                 : 'hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
           >
@@ -225,7 +225,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                     </h3>
                     <button
                       onClick={() => setActiveTab('ocr')}
-                      className="text-xs text-[#FF2A6D] hover:underline flex items-center gap-1 font-medium"
+                      className="text-xs text-[#C83E0B] hover:underline flex items-center gap-1 font-medium"
                     >
                       <ZoomIn className="w-3.5 h-3.5" />
                       View High-Res &amp; Transcription
@@ -329,7 +329,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                     href={source.externalUrl}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-semibold transition-all shrink-0 self-start sm:self-auto"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-semibold transition-all shrink-0 self-start sm:self-auto"
                   >
                     <span>
                       {source.externalUrl.includes('substack.com')
@@ -478,7 +478,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                   onDeleteSource(source.id);
                   onClose();
                 }}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#5F6368] hover:text-white hover:bg-[#FF2A6D] rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#5F6368] hover:text-white hover:bg-[#C83E0B] rounded-lg transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 Delete from Archive
@@ -488,7 +488,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
               <button
                 type="button"
                 onClick={() => onEditSource(source)}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#0B0B0C] hover:text-white hover:bg-[#FF2A6D] rounded-lg transition-colors"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-[#0B0B0C] hover:text-white hover:bg-[#C83E0B] rounded-lg transition-colors"
               >
                 <Pencil className="w-3.5 h-3.5" />
                 Edit All Fields &amp; Passages
@@ -508,7 +508,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                 onAskAboutSource(source);
                 onClose();
               }}
-              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-semibold transition-colors"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-semibold transition-colors"
             >
               <MessageSquare className="w-3.5 h-3.5" />
               Ask Manuscript About This

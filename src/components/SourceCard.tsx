@@ -25,23 +25,23 @@ const TYPE_CONFIG: Record<
 > = {
   chapter: {
     label: 'Book Chapter',
-    color: 'text-[#8A3B49]',
-    bg: 'bg-[#FDF0F2]',
-    border: 'border-[#F5CCD3]',
+    color: 'text-[#A93207]',
+    bg: 'bg-[#FDF2EE]',
+    border: 'border-[#F5D5C8]',
     icon: BookMarked,
   },
   article: {
     label: 'Substack Article',
-    color: 'text-[#FF2A6D]',
-    bg: 'bg-[#FFF0F4]',
-    border: 'border-[#FFCCD8]',
+    color: 'text-[#C83E0B]',
+    bg: 'bg-[#FDF2EE]',
+    border: 'border-[#F5D5C8]',
     icon: FileText,
   },
   scan: {
     label: 'Archival Scan / OCR',
-    color: 'text-[#9E3E50]',
-    bg: 'bg-[#FAF2F4]',
-    border: 'border-[#F3CBD2]',
+    color: 'text-[#C83E0B]',
+    bg: 'bg-[#FDF2EE]',
+    border: 'border-[#F5D5C8]',
     icon: ImageIcon,
   },
   note: {
@@ -82,7 +82,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
     <div
       className={`group relative rounded-xl border transition-all duration-200 bg-[#FDFCFA] shadow-sm hover:shadow-md ${
         isSelected
-          ? 'border-[#C85A6E] ring-1 ring-[#C85A6E]/30'
+          ? 'border-[#C83E0B] ring-1 ring-[#C83E0B]/30'
           : 'border-[#EAE1D9] hover:border-[#D9CFC4]'
       }`}
     >
@@ -94,7 +94,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
               type="checkbox"
               checked={isSelected}
               onChange={() => onToggleSelect(source.id)}
-              className="w-4 h-4 rounded text-[#C85A6E] focus:ring-[#C85A6E] border-[#E0D4CB] cursor-pointer accent-[#C85A6E]"
+              className="w-4 h-4 rounded text-[#C83E0B] focus:ring-[#C83E0B] border-[#E0D4CB] cursor-pointer accent-[#C83E0B]"
             />
             <span
               className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium border ${config.bg} ${config.color} ${config.border}`}
@@ -117,7 +117,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
             {source.ocrData && (
               <span
                 title="Automated OCR transcription available"
-                className="inline-flex items-center text-[10px] font-medium text-[#9E3E50] bg-[#FAF2F4] px-1.5 py-0.5 rounded border border-[#F3CBD2]"
+                className="inline-flex items-center text-[10px] font-medium text-[#C83E0B] bg-[#FDF2EE] px-1.5 py-0.5 rounded border border-[#F5D5C8]"
               >
                 <Sparkles className="w-2.5 h-2.5 mr-0.5" />
                 OCR
@@ -158,7 +158,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
         {/* Title and metadata */}
         <h4
           onClick={() => onClick(source)}
-          className="font-medium text-[#241B1C] text-sm leading-snug line-clamp-2 cursor-pointer hover:text-[#C85A6E] transition-colors"
+          className="font-medium text-[#241B1C] text-sm leading-snug line-clamp-2 cursor-pointer hover:text-[#C83E0B] transition-colors"
         >
           {source.title}
         </h4>
@@ -183,7 +183,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
             {source.tags.slice(0, 2).map((tag) => (
               <span
                 key={tag}
-                className="px-1.5 py-0.5 rounded bg-[#FAF2F4] text-[#8A3B49] border border-[#F5CCD3] text-[10px] truncate max-w-[85px]"
+                className="px-1.5 py-0.5 rounded bg-[#FDF2EE] text-[#A93207] border border-[#F5D5C8] text-[10px] truncate max-w-[85px]"
               >
                 #{tag}
               </span>
@@ -199,7 +199,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 text-[#FF2A6D] hover:text-[#E61556] font-semibold shrink-0"
+              className="inline-flex items-center gap-1 text-[#C83E0B] hover:text-[#A93207] font-semibold shrink-0"
               title="Open external source or book buy page"
             >
               <span>{source.type === 'book' ? 'Buy / Read' : 'View Link'}</span>
