@@ -248,6 +248,8 @@ export default function App() {
       return {
         ...source,
         section: resolvedSection,
+        imageUrl: undefined,
+        images: undefined,
       };
     }
     const optimizedImages: string[] = [];
@@ -329,6 +331,7 @@ export default function App() {
             sources: lightweightSources,
             deletedIds: targetDeleted,
             bookMetadata: targetMetadata,
+            preserveExistingImages: true,
           }),
         });
 
@@ -436,50 +439,38 @@ export default function App() {
 
         const stored = await loadArchiveFromDB();
 
-        // Build merged map starting from seedSources -> serverSources -> (if Studio Admin) local IndexedDB sources
+        // Build canonical source map:
+        // When serverSources is available from /api/archive, it is the authoritative persisted state
+        // (including any removed images or edited passages).
         const byId = new Map<string, Source>();
 
-        for (const seed of seedSources) {
-          if (!combinedDeleted.has(seed.id) && !isPurgedArchiveSource(seed)) {
-            const seedImgs = getSourceImages(seed);
-            byId.set(seed.id, {
-              ...seed,
-              section: getSourceSection(seed),
-              imageUrl: seedImgs[0] || seed.imageUrl,
-              images: seedImgs.length > 0 ? seedImgs : undefined,
-            });
-          }
-        }
-
-        for (const srv of serverSources) {
-          if (srv && srv.id && !combinedDeleted.has(srv.id) && !isPurgedArchiveSource(srv)) {
-            const existing = byId.get(srv.id);
-            const srvImages = getSourceImages(srv);
-            if (!existing) {
+        if (serverSources.length > 0) {
+          for (const srv of serverSources) {
+            if (srv && srv.id && !combinedDeleted.has(srv.id) && !isPurgedArchiveSource(srv)) {
+              const srvImages = getSourceImages(srv);
               byId.set(srv.id, {
                 ...srv,
                 section: getSourceSection(srv),
-                imageUrl: srvImages[0] || srv.imageUrl,
+                imageUrl: srvImages[0] || undefined,
                 images: srvImages.length > 0 ? srvImages : undefined,
               });
-            } else {
-              const exImages = getSourceImages(existing);
-              const mergedImages = srvImages.length > 0 ? srvImages : exImages;
-              const merged = {
-                ...existing,
-                ...srv,
-              };
-              byId.set(srv.id, {
-                ...merged,
-                section: getSourceSection(merged),
-                imageUrl: mergedImages[0] || srv.imageUrl || existing.imageUrl,
-                images: mergedImages.length > 0 ? mergedImages : undefined,
+            }
+          }
+        } else {
+          for (const seed of seedSources) {
+            if (!combinedDeleted.has(seed.id) && !isPurgedArchiveSource(seed)) {
+              const seedImgs = getSourceImages(seed);
+              byId.set(seed.id, {
+                ...seed,
+                section: getSourceSection(seed),
+                imageUrl: seedImgs[0] || undefined,
+                images: seedImgs.length > 0 ? seedImgs : undefined,
               });
             }
           }
         }
 
-        // If the author is in Google AI Studio Build mode, merge any newer edits or newly created cards from her browser IndexedDB
+        // Only merge brand-new offline-created cards from IndexedDB that do not exist on the server yet
         let hasLocalUnsyncedChanges = localDeletedIds.some(
           (id) => !serverDeletedIds.includes(id)
         );
@@ -489,56 +480,15 @@ export default function App() {
             if (!loc || !loc.id || combinedDeleted.has(loc.id) || isPurgedArchiveSource(loc)) {
               continue;
             }
-            const current = byId.get(loc.id);
-            const locImages = getSourceImages(loc);
-            if (!current) {
+            if (!byId.has(loc.id)) {
+              const locImages = getSourceImages(loc);
               hasLocalUnsyncedChanges = true;
               byId.set(loc.id, {
                 ...loc,
                 section: getSourceSection(loc),
-                imageUrl: locImages[0] || loc.imageUrl,
+                imageUrl: locImages[0] || undefined,
                 images: locImages.length > 0 ? locImages : undefined,
               });
-            } else {
-              const curImages = getSourceImages(current);
-              const serverHasStaticAsset = curImages.some((img) =>
-                img.startsWith('/assets/')
-              );
-              const locHasOnlyDataUrls =
-                locImages.length > 0 &&
-                locImages.every((img) => img.startsWith('data:'));
-
-              const locTime =
-                loc.updatedAt || (loc.createdAt > 1710000000000 ? loc.createdAt : 0);
-              const curTime =
-                current.updatedAt ||
-                (current.createdAt > 1710000000000 ? current.createdAt : 0);
-
-              if (locTime > curTime) {
-                hasLocalUnsyncedChanges = true;
-                const merged = { ...current, ...loc };
-                const imgsToUse =
-                  serverHasStaticAsset && locHasOnlyDataUrls && locImages.length === curImages.length
-                    ? curImages
-                    : locImages.length > 0
-                    ? locImages
-                    : curImages;
-                byId.set(loc.id, {
-                  ...merged,
-                  section: getSourceSection(merged),
-                  imageUrl: imgsToUse[0] || loc.imageUrl || current.imageUrl,
-                  images: imgsToUse.length > 0 ? imgsToUse : undefined,
-                });
-              } else {
-                const imgsToUse = curImages.length > 0 ? curImages : locImages;
-                const merged = { ...loc, ...current };
-                byId.set(loc.id, {
-                  ...merged,
-                  section: getSourceSection(merged),
-                  imageUrl: imgsToUse[0] || current.imageUrl || loc.imageUrl,
-                  images: imgsToUse.length > 0 ? imgsToUse : undefined,
-                });
-              }
             }
           }
         }
@@ -553,7 +503,7 @@ export default function App() {
         setSelectedSourceIds(finalSources.map((s) => s.id));
         setSyncedStats(computeLocalStats(finalSources));
 
-        // Only auto-publish on startup if local IndexedDB has unsynced edits or new sources
+        // Only auto-publish on startup if local IndexedDB has unsynced brand-new sources or deletions
         if (isStudioBuildMode) {
           if (hasLocalUnsyncedChanges) {
             await publishArchiveToPublic(
@@ -606,17 +556,47 @@ export default function App() {
         ...updatedSource,
         updatedAt: Date.now(),
       });
-      const newChunks = await indexSource(optimized);
+
+      // Persist single-card update directly to server first so image removals and edits are saved atomically
+      let persistedSource = optimized;
+      try {
+        setSyncStatus('syncing');
+        const singleRes = await fetch('/api/archive/source', {
+          method: 'POST',
+          headers: getAdminHeaders(),
+          body: JSON.stringify({ source: optimized }),
+        });
+        if (singleRes.ok) {
+          const singleData = await singleRes.json();
+          if (singleData?.source) {
+            persistedSource = {
+              ...singleData.source,
+              imageUrl: singleData.source.imageUrl || undefined,
+              images:
+                Array.isArray(singleData.source.images) && singleData.source.images.length > 0
+                  ? singleData.source.images
+                  : undefined,
+            };
+          }
+        }
+      } catch (srvErr) {
+        console.warn('Direct source save notice:', srvErr);
+      }
+
+      const newChunks = await indexSource(persistedSource);
       const nextSources = sources.map((s) =>
-        s.id === optimized.id ? optimized : s
+        s.id === persistedSource.id ? persistedSource : s
       );
       setSources(nextSources);
       setVectorChunks((prev) => [
-        ...prev.filter((c) => c.sourceId !== optimized.id),
+        ...prev.filter((c) => c.sourceId !== persistedSource.id),
         ...newChunks,
       ]);
       setActiveSourceDetail((prev) =>
-        prev && prev.id === optimized.id ? optimized : prev
+        prev && prev.id === persistedSource.id ? persistedSource : prev
+      );
+      setEditingSource((prev) =>
+        prev && prev.id === persistedSource.id ? persistedSource : prev
       );
 
       await publishArchiveToPublic(nextSources);
@@ -644,13 +624,37 @@ export default function App() {
       }
       const updatedSource: Source = {
         ...targetSource,
-        imageUrl: mergedImages[0] || targetSource.imageUrl,
-        images: mergedImages,
+        imageUrl: mergedImages[0] || undefined,
+        images: mergedImages.length > 0 ? mergedImages : undefined,
         updatedAt: Date.now(),
       };
       await handleUpdateSource(updatedSource);
     } catch (err) {
       console.warn('Failed to add pictures to source:', err);
+    }
+  };
+
+  // Remove a specific picture (or all pictures if imageIndex is omitted) from a source card
+  const handleRemovePictureFromSource = async (
+    targetSource: Source,
+    imageIndex?: number
+  ) => {
+    if (!isStudioBuildMode) return;
+    try {
+      const existingImages = getSourceImages(targetSource);
+      const remainingImages =
+        typeof imageIndex === 'number'
+          ? existingImages.filter((_, idx) => idx !== imageIndex)
+          : [];
+      const updatedSource: Source = {
+        ...targetSource,
+        imageUrl: remainingImages[0] || undefined,
+        images: remainingImages.length > 0 ? remainingImages : undefined,
+        updatedAt: Date.now(),
+      };
+      await handleUpdateSource(updatedSource);
+    } catch (err) {
+      console.warn('Failed to remove picture from source:', err);
     }
   };
 
@@ -970,6 +974,9 @@ export default function App() {
           onAddPicturesToSource={
             isStudioBuildMode ? handleAddPicturesToSource : undefined
           }
+          onRemovePictureFromSource={
+            isStudioBuildMode ? handleRemovePictureFromSource : undefined
+          }
           onDeleteSource={isStudioBuildMode ? handleDeleteSource : undefined}
           isStudioAdmin={isStudioBuildMode}
           totalVectorChunks={vectorChunks.length}
@@ -1070,6 +1077,9 @@ export default function App() {
         }
         onAddPicturesToSource={
           isStudioBuildMode ? handleAddPicturesToSource : undefined
+        }
+        onRemovePictureFromSource={
+          isStudioBuildMode ? handleRemovePictureFromSource : undefined
         }
         isStudioAdmin={isStudioBuildMode}
       />

@@ -917,6 +917,31 @@ app.get(['/api/archive', '/archive-store.json'], (_req, res) => {
   });
 });
 
+function cleanupUnreferencedCardAssets(sources: any[]): void {
+  try {
+    if (!fs.existsSync(CARDS_ASSETS_DIR)) return;
+    const referencedFiles = new Set<string>();
+    for (const s of sources) {
+      if (!s) continue;
+      const imgs = getNormalizedSourceImages(s);
+      for (const img of imgs) {
+        if (typeof img === 'string' && img.startsWith('/assets/cards/')) {
+          const base = path.basename(img);
+          if (base) referencedFiles.add(base);
+        }
+      }
+    }
+    const existingFiles = fs.readdirSync(CARDS_ASSETS_DIR);
+    for (const file of existingFiles) {
+      if (!referencedFiles.has(file)) {
+        try {
+          fs.unlinkSync(path.join(CARDS_ASSETS_DIR, file));
+        } catch {}
+      }
+    }
+  } catch {}
+}
+
 // Studio Admin POST /api/archive/sync: Syncs author's local Studio sources, citations & pictures to server store
 app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
   if (!isStudioAdminRequest(req)) {
@@ -926,6 +951,7 @@ app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
   }
 
   const incomingSources = Array.isArray(req.body?.sources) ? req.body.sources : [];
+  const preserveExistingImages = Boolean(req.body?.preserveExistingImages);
   const incomingDeletedIds = Array.isArray(req.body?.deletedIds)
     ? req.body.deletedIds
         .map((id: unknown) => clampString(id, 140))
@@ -936,42 +962,51 @@ app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
   const store = readArchiveStore();
   const deletedSet = new Set<string>([...store.deletedIds, ...incomingDeletedIds]);
 
-  const byId = new Map<string, any>();
+  const existingById = new Map<string, any>();
   for (const s of store.sources) {
     if (s && s.id && !deletedSet.has(s.id)) {
-      byId.set(s.id, s);
+      existingById.set(s.id, s);
     }
   }
 
+  const nextSources: any[] = [];
+  const seenIds = new Set<string>();
+
   for (const rawInc of incomingSources.slice(0, 500)) {
     const inc = sanitizeSourceRecord(rawInc);
-    if (!inc || deletedSet.has(inc.id)) continue;
-    const existing = byId.get(inc.id);
+    if (!inc || deletedSet.has(inc.id) || seenIds.has(inc.id)) continue;
+    seenIds.add(inc.id);
+
+    const existing = existingById.get(inc.id);
     if (!existing) {
-      byId.set(inc.id, inc);
+      nextSources.push(inc);
     } else {
       const incImages = getNormalizedSourceImages(inc);
       const exImages = getNormalizedSourceImages(existing);
-      const mergedImages = incImages.length > 0 ? incImages : exImages;
-      const mergedImageUrl = mergedImages[0] || inc.imageUrl || existing.imageUrl;
+      // Only fall back to existing images if preserveExistingImages is explicitly set for chunked uploads;
+      // otherwise respect image removals (incImages = []) when the author deletes a picture from a card.
+      const finalImages =
+        preserveExistingImages && incImages.length === 0 ? exImages : incImages;
 
-      byId.set(inc.id, {
+      nextSources.push({
         ...existing,
         ...inc,
         section: getNormalizedSourceSection(inc),
-        imageUrl: mergedImageUrl,
-        images: mergedImages.length > 0 ? mergedImages : undefined,
+        imageUrl: finalImages[0] || undefined,
+        images: finalImages.length > 0 ? finalImages : undefined,
+        updatedAt: Date.now(),
       });
     }
   }
 
-  store.sources = Array.from(byId.values());
+  store.sources = nextSources;
   store.deletedIds = Array.from(deletedSet);
   if (incomingMetadata) {
     store.bookMetadata = incomingMetadata;
   }
 
   writeArchiveStore(store);
+  cleanupUnreferencedCardAssets(store.sources);
   const stats = computeArchiveStats(store.sources);
   return res.json({
     ...store,
@@ -997,6 +1032,11 @@ app.post('/api/archive/source', adminRateLimiter, (req, res) => {
 
   const enrichedSource = {
     ...sanitized,
+    imageUrl: sanitized.images?.[0] || sanitized.imageUrl || undefined,
+    images:
+      Array.isArray(sanitized.images) && sanitized.images.length > 0
+        ? sanitized.images
+        : undefined,
     updatedAt: Date.now(),
   };
 
@@ -1008,6 +1048,7 @@ app.post('/api/archive/source', adminRateLimiter, (req, res) => {
   }
 
   writeArchiveStore(store);
+  cleanupUnreferencedCardAssets(store.sources);
   const stats = computeArchiveStats(store.sources);
   return res.json({ status: 'ok', source: enrichedSource, store, stats });
 });
@@ -1032,6 +1073,7 @@ app.delete('/api/archive/source/:id', adminRateLimiter, (req, res) => {
   }
 
   writeArchiveStore(store);
+  cleanupUnreferencedCardAssets(store.sources);
   const stats = computeArchiveStats(store.sources);
   return res.json({ status: 'ok', deletedId: targetId, store, stats });
 });

@@ -22,6 +22,7 @@ interface SourceDetailModalProps {
   onDeleteSource?: (id: string) => void;
   onEditSource?: (source: Source) => void;
   onAddPicturesToSource?: (source: Source, dataUrls: string[]) => Promise<void> | void;
+  onRemovePictureFromSource?: (source: Source, imageIndex?: number) => Promise<void> | void;
   isStudioAdmin?: boolean;
 }
 
@@ -32,6 +33,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
   onDeleteSource,
   onEditSource,
   onAddPicturesToSource,
+  onRemovePictureFromSource,
   isStudioAdmin = false,
 }) => {
   const [copied, setCopied] = useState(false);
@@ -230,13 +232,26 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                         ? `Attached Pictures & Scans (${allImages.length})`
                         : 'Archival Manuscript / Picture Preview'}
                     </h3>
-                    <button
-                      onClick={() => setActiveTab('ocr')}
-                      className="text-xs text-[#C83E0B] hover:underline flex items-center gap-1 font-medium"
-                    >
-                      <ZoomIn className="w-3.5 h-3.5" />
-                      {canViewRawText ? 'View High-Res & Transcription' : 'View High-Res Picture'}
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {isStudioAdmin && onRemovePictureFromSource && (
+                        <button
+                          type="button"
+                          onClick={() => onRemovePictureFromSource(source, selectedImageIdx)}
+                          className="text-xs text-[#5F6368] hover:text-[#0B0B0C] flex items-center gap-1 font-medium cursor-pointer"
+                          title="Delete this picture from card"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                          <span>Remove Picture</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setActiveTab('ocr')}
+                        className="text-xs text-[#C83E0B] hover:underline flex items-center gap-1 font-medium"
+                      >
+                        <ZoomIn className="w-3.5 h-3.5" />
+                        {canViewRawText ? 'View High-Res & Transcription' : 'View High-Res Picture'}
+                      </button>
+                    </div>
                   </div>
 
                   <div

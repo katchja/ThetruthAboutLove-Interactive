@@ -18,7 +18,7 @@ import { BookMetadata, Source, ChatMessage, Citation, ChatModelTier, getSourceSe
 import { LabsFlowerShape, LabsCloudShape, Labs3DBlobShape } from './LabsFloatingShapes';
 import { FAIR_DISCLOSURE_SHORT_TEXT } from '../utils/chatGuardrails';
 
-const BOOK_COVER_SRC = '/assets/aistudio/Book_cover_8c0e35cc.png';
+const BOOK_COVER_SRC = '/assets/aistudio/Book_cover__5__ce375b5d.png';
 
 interface TruthQuoteItem {
   id: string;

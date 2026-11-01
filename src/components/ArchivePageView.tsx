@@ -45,6 +45,7 @@ interface ArchivePageViewProps {
   onAskAboutSourceInStudio: (source: Source) => void;
   onEditSource?: (source: Source) => void;
   onAddPicturesToSource?: (source: Source, dataUrls: string[]) => Promise<void> | void;
+  onRemovePictureFromSource?: (source: Source, imageIndex?: number) => Promise<void> | void;
   onDeleteSource?: (id: string) => void;
   isStudioAdmin?: boolean;
   totalVectorChunks: number;
@@ -114,6 +115,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
   onAskAboutSourceInStudio,
   onEditSource,
   onAddPicturesToSource,
+  onRemovePictureFromSource,
   onDeleteSource,
   isStudioAdmin = false,
   totalVectorChunks,
@@ -568,6 +570,20 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                                 {cardImages.length} pictures
                               </span>
                             )}
+                            {isStudioAdmin && onRemovePictureFromSource && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onRemovePictureFromSource(source, 0);
+                                }}
+                                className="absolute top-2.5 right-2.5 z-30 px-2.5 py-1 rounded-full bg-[#0B0B0C]/85 hover:bg-[#C83E0B] text-white text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Remove cover picture from this card"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Remove Picture</span>
+                              </button>
+                            )}
                             <div className="absolute inset-0 z-20 bg-[#0B0B0C]/30 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
                               <span className="text-xs text-white bg-[#0B0B0C]/90 px-3 py-1.5 rounded-full flex items-center gap-1.5 font-medium">
                                 <Eye className="w-3.5 h-3.5" />
@@ -676,6 +692,18 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                                   className="hidden"
                                 />
                               </label>
+                            )}
+
+                            {primaryImage && onRemovePictureFromSource && (
+                              <button
+                                type="button"
+                                onClick={() => onRemovePictureFromSource(source)}
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FFFFFF] hover:bg-[#E8EAED] text-[#5F6368] hover:text-[#0B0B0C] text-[11px] font-medium transition-colors cursor-pointer"
+                                title="Remove Picture from Card"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                                <span>Remove Picture</span>
+                              </button>
                             )}
                           </div>
 

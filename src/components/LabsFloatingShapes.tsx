@@ -117,7 +117,7 @@ export const LabsFlowerShape: React.FC<LabsShapeProps> = ({
           )}
         </g>
 
-        {/* Subtle tactile grain overlay matching Google Labs reference slides */}
+        {/* Subtle tactile grain overlay*/}
         <rect
           x="0"
           y="0"
@@ -132,7 +132,6 @@ export const LabsFlowerShape: React.FC<LabsShapeProps> = ({
 };
 
 /**
- * 3-Lobe Asymmetric Cloud / Clover Shape inspired by Google Labs (Screenshots 2 & 4).
  * Uses 3 overlapping organic circles inside a <clipPath>, filled with a soft
  * blurred mesh gradient of light yellow, soft blush pink, and pale cream mist.
  */
@@ -154,7 +153,7 @@ export const LabsCloudShape: React.FC<LabsShapeProps> = ({
       aria-hidden="true"
     >
       <defs>
-        {/* 3-lobe asymmetric cloud silhouette matching Screenshots 2 & 4 */}
+        {/* 3-lobe asymmetric cloud silhouette */}
         <clipPath id={clipId}>
           {/* Top-left / upper center lobe */}
           <circle cx="242" cy="184" r="142" />
@@ -238,10 +237,10 @@ interface Labs3DBlobShapeProps {
   variant?: 'default' | 'tilted' | 'mirrored';
 }
 
-const BLOB_3D_ASSET_SRC = '/assets/aistudio/39_0e8514b5.png';
+const BLOB_3D_ASSET_SRC = '/assets/aistudio/yellow3d_blob_fe91dbd0.png';
 
 /**
- * 3D Golden Sculptural Organic Blob asset (/assets/aistudio/39_0e8514b5.png).
+ * 3D Golden Sculptural Organic Blob asset (/assets/aistudio/yellow3d_blob_fe91dbd0.png).
  * Uses radial edge feathering + multiply blending so it floats seamlessly on
  * any light or pastel canvas without visible bounding edges.
  */
