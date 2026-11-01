@@ -2,27 +2,19 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { 
   BookOpen, 
   Sparkles, 
-  Volume2, 
-  VolumeX,
   ArrowRight, 
-  ShieldCheck, 
-  Quote, 
   ChevronRight,
   Send,
   Archive,
-  Heart,
   Flame,
   Copy,
   Check,
   RotateCcw,
   MessageSquare
 } from 'lucide-react';
-import { BookMetadata, Source, ChatMessage, Citation, VoiceSettings, ChatModelTier, getSourceSection } from '../types';
-import { speechEngine } from '../utils/speechEngine';
+import { BookMetadata, Source, ChatMessage, Citation, ChatModelTier, getSourceSection } from '../types';
 import bookCoverImg from '../assets/images/assets/aistudio/Cover_6f04220a.png';
 import { LabsFlowerShape, LabsCloudShape } from './LabsFloatingShapes';
-
-const DEFAULT_AUTHOR_VOICE_ID = 'voice_lp7vh3bk6taq';
 
 interface TruthQuoteItem {
   id: string;
@@ -78,8 +70,6 @@ interface LandingPageViewProps {
   onSendMessage: (query: string) => Promise<void>;
   isChatLoading: boolean;
   onClearChat?: () => void;
-  voiceSettings: VoiceSettings;
-  onOpenVoiceSettings?: () => void;
   chatModel: ChatModelTier;
   onChangeChatModel: (model: ChatModelTier) => void;
   isOfflineMode: boolean;
@@ -93,14 +83,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   onSendMessage,
   isChatLoading,
   onClearChat,
-  voiceSettings,
   chatModel,
   onChangeChatModel,
-  isOfflineMode,
 }) => {
   const [quickQuery, setQuickQuery] = useState('');
-  const [isPlayingIntro, setIsPlayingIntro] = useState(false);
-  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeQuoteIndex, setActiveQuoteIndex] = useState(0);
 
@@ -166,69 +152,12 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
     }
   };
 
-  const embeddedAuthorVoiceId =
-    voiceSettings.voiceCloningKey &&
-    !voiceSettings.voiceCloningKey.startsWith('gcv-catalina-author-v1-')
-      ? voiceSettings.voiceCloningKey
-      : DEFAULT_AUTHOR_VOICE_ID;
-
-  const handlePlayVoiceIntro = () => {
-    if (isPlayingIntro) {
-      speechEngine.stop();
-      setIsPlayingIntro(false);
-      return;
-    }
-
-    const introText = `Love is not an emotion. It is a fundamental life force. When we understand this truth, the quality of our inner life increases. You expand who you are and dissolve the distortions that make you less than: the power dynamics, the control disguised as deep connection, the programmatic content regulating your emotions, and the synthetic AI lovers. By 2030, inner life and love will collide with a changed collective reality, one where AI-generated thought takes more room than your truth. To preserve the power of love, and to live a life to the highest standard, here's a place to start. This manifesto is for you, fierce lovers!`;
-    setIsPlayingIntro(true);
-    speechEngine.speak(
-      introText,
-      {
-        ...voiceSettings,
-        engine: voiceSettings.engine || 'cloned_author',
-        voiceName: embeddedAuthorVoiceId,
-        voiceCloningKey: embeddedAuthorVoiceId,
-        style: 'author_monologue',
-        isClonedVoiceActive: true,
-      },
-      {
-        onEnd: () => setIsPlayingIntro(false),
-        onError: () => setIsPlayingIntro(false),
-      }
-    );
-  };
-
   const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!quickQuery.trim() || isChatLoading) return;
     const q = quickQuery.trim();
     setQuickQuery('');
     await onSendMessage(q);
-  };
-
-  const handleSpeak = (messageId: string, content: string) => {
-    if (speakingMessageId === messageId) {
-      speechEngine.stop();
-      setSpeakingMessageId(null);
-      return;
-    }
-
-    setSpeakingMessageId(messageId);
-    speechEngine.speak(
-      content,
-      {
-        ...voiceSettings,
-        engine: voiceSettings.engine || 'cloned_author',
-        voiceName: embeddedAuthorVoiceId,
-        voiceCloningKey: embeddedAuthorVoiceId,
-        style: 'author_monologue',
-        isClonedVoiceActive: true,
-      },
-      {
-        onEnd: () => setSpeakingMessageId(null),
-        onError: () => setSpeakingMessageId(null),
-      }
-    );
   };
 
   const handleCopy = (id: string, text: string) => {
@@ -658,7 +587,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                           <div className="flex items-center justify-between gap-3 mb-4 pb-3 text-xs text-[#5F6368]">
                             <div className="flex items-center gap-2.5 font-mono font-medium text-[#0B0B0C]">
                               <Sparkles className="w-4 h-4 text-[#0B0B0C]" />
-                              <span>Manuscript voiceover</span>
+                              <span>Manuscript Response</span>
                             </div>
                             <span className="text-[11px] font-mono tabular-nums text-[#80868B]">
                               {new Date(message.timestamp).toLocaleTimeString([], {
@@ -706,28 +635,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                         {message.role === 'assistant' && (
                           <div className="mt-5 pt-4 flex items-center justify-between flex-wrap gap-4 text-xs">
                             <div className="flex items-center gap-3">
-                              <button
-                                onClick={() => handleSpeak(message.id, message.content)}
-                                className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-xs font-medium transition-colors cursor-pointer ${
-                                  speakingMessageId === message.id
-                                    ? 'bg-[#FF2A6D] text-white animate-pulse'
-                                    : 'bg-[#FF2A6D] text-white hover:bg-[#E61556]'
-                                }`}
-                                title="Listen"
-                              >
-                                {speakingMessageId === message.id ? (
-                                  <>
-                                    <VolumeX className="w-3.5 h-3.5" />
-                                    <span>Stop</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Volume2 className="w-3.5 h-3.5" />
-                                    <span>Read aloud</span>
-                                  </>
-                                )}
-                              </button>
-
                               <button
                                 type="button"
                                 onClick={() => {
@@ -838,15 +745,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 </a>
 
                 <button
-                  onClick={handlePlayVoiceIntro}
-                  data-voice-id={embeddedAuthorVoiceId}
-                  className="px-6 py-4 rounded-full bg-[#F1F3F4] text-[#0B0B0C] hover:bg-[#E8EAED] text-sm font-sans font-medium transition-colors flex items-center gap-2.5 cursor-pointer"
-                >
-                  <Volume2 className={`w-4 h-4 text-[#0B0B0C] ${isPlayingIntro ? 'animate-pulse' : ''}`} />
-                  <span>{isPlayingIntro ? 'Stop Voice Intro' : "Hear Catalina's Voice"}</span>
-                </button>
-
-                <button
                   onClick={onOpenArchive}
                   className="px-6 py-4 rounded-full bg-[#F1F3F4] text-[#0B0B0C] text-sm font-sans font-medium hover:bg-[#E8EAED] transition-colors flex items-center gap-2 cursor-pointer"
                 >
@@ -932,14 +830,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   — <strong className="text-[#0B0B0C] font-medium">Catalina Butnaru</strong>, author of <em>The Truth About Love</em>
                 </p>
               </div>
-
-              <button
-                onClick={handlePlayVoiceIntro}
-                className="px-7 py-4 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-sans font-medium flex items-center gap-2.5 transition-colors self-start sm:self-auto cursor-pointer"
-              >
-                <Volume2 className="w-3.5 h-3.5" />
-                <span>Hear Catalina Recite the Manifesto</span>
-              </button>
             </div>
           </div>
         </div>

@@ -1,9 +1,7 @@
 import React from 'react';
 import {
   Heart,
-  MessageSquare,
   ShieldCheck,
-  Volume2,
   Settings,
   Search,
   Database,
@@ -12,7 +10,7 @@ import {
   CheckCircle2,
   RefreshCw,
 } from 'lucide-react';
-import { BookMetadata, AppView, VoiceSettings } from '../types';
+import { BookMetadata, AppView } from '../types';
 
 interface HeaderProps {
   currentView: AppView;
@@ -20,8 +18,6 @@ interface HeaderProps {
   isOfflineMode: boolean;
   setIsOfflineMode: (offline: boolean) => void;
   bookMetadata: BookMetadata;
-  voiceSettings?: VoiceSettings;
-  onOpenVoiceSettings?: () => void;
   onOpenBookSettings?: () => void;
   onToggleSemanticSearch: () => void;
   isSemanticSearchOpen: boolean;
@@ -42,22 +38,13 @@ export const Header: React.FC<HeaderProps> = ({
   setCurrentView,
   isOfflineMode,
   setIsOfflineMode,
-  voiceSettings,
-  onOpenVoiceSettings,
   onOpenBookSettings,
   onToggleSemanticSearch,
   isSemanticSearchOpen,
-  onOpenChatPopup,
   onPublishToPublic,
   syncStatus = 'idle',
   syncedStats,
 }) => {
-  const embeddedVoiceId =
-    voiceSettings?.voiceCloningKey &&
-    !voiceSettings.voiceCloningKey.startsWith('gcv-catalina-author-v1-')
-      ? voiceSettings.voiceCloningKey
-      : 'voice_lp7vh3bk6taq';
-
   return (
     <header className="sticky top-0 z-30 bg-[#FFFFFF]/95 backdrop-blur-md text-[#0B0B0C]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
@@ -198,19 +185,6 @@ export const Header: React.FC<HeaderProps> = ({
               </>
             )}
           </button>
-
-          {/* Voice Cloning Studio configuration — visible only to the author in Google AI Studio Build mode */}
-          {onOpenVoiceSettings && (
-            <button
-              onClick={onOpenVoiceSettings}
-              data-voice-id={embeddedVoiceId}
-              className="px-3 py-1.5 rounded-lg bg-[#F1F3F4] text-[#202124] hover:text-[#0B0B0C] hover:bg-[#E8EAED] transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap cursor-pointer"
-              title="Open Author Voice Studio"
-            >
-              <Volume2 className="w-3.5 h-3.5 text-current" />
-              <span className="hidden xl:inline">Author Voice</span>
-            </button>
-          )}
 
           {/* Book settings — visible only to the author in Google AI Studio Build mode */}
           {onOpenBookSettings && (

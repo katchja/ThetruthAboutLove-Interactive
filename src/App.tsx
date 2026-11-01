@@ -7,14 +7,12 @@ import { SemanticSearchPanel } from './components/SemanticSearchPanel';
 import { LandingPageView } from './components/LandingPageView';
 import { ArchivePageView } from './components/ArchivePageView';
 import { ConversationalPopupWindow } from './components/ConversationalPopupWindow';
-import { VoiceSettingsModal } from './components/VoiceSettingsModal';
 import { BookSettingsModal } from './components/BookSettingsModal';
 import {
   Source,
   VectorChunk,
   ChatMessage,
   BookMetadata,
-  VoiceSettings,
   Citation,
   AppView,
   ArchiveSection,
@@ -33,47 +31,6 @@ import {
   getDeletedSourceIds,
   isPurgedArchiveSource,
 } from './utils/vectorStore';
-
-const DEFAULT_AUTHOR_VOICE_ID = 'voice_lp7vh3bk6taq';
-const VOICE_STORAGE_KEY = 'TruthAboutLove_VoiceSettings_v3';
-
-const DEFAULT_VOICE_SETTINGS: VoiceSettings = {
-  engine: 'cloned_author',
-  voiceName: DEFAULT_AUTHOR_VOICE_ID,
-  rate: 1.0,
-  pitch: 1.0,
-  volume: 1.0,
-  style: 'author_monologue',
-  voiceCloningKey: DEFAULT_AUTHOR_VOICE_ID,
-  voicePersonaPrompt:
-    'Warm, articulate, poised female author voice with a luminous philosophical cadence, deliberate rhythmic pacing, resonant alto timbre, and fierce intellectual clarity',
-  prebuiltBaseVoice: 'Kore',
-  isClonedVoiceActive: true,
-};
-
-function loadInitialVoiceSettings(): VoiceSettings {
-  if (typeof window === 'undefined') return DEFAULT_VOICE_SETTINGS;
-  try {
-    const saved = window.localStorage.getItem(VOICE_STORAGE_KEY);
-    if (saved) {
-      const parsed = JSON.parse(saved);
-      const validVoiceKey =
-        parsed.voiceCloningKey &&
-        !String(parsed.voiceCloningKey).startsWith('gcv-catalina-author-v1-')
-          ? parsed.voiceCloningKey
-          : DEFAULT_AUTHOR_VOICE_ID;
-      return {
-        ...DEFAULT_VOICE_SETTINGS,
-        ...parsed,
-        engine: parsed.engine || 'cloned_author',
-        voiceName: validVoiceKey,
-        voiceCloningKey: validVoiceKey,
-        isClonedVoiceActive: true,
-      };
-    }
-  } catch {}
-  return DEFAULT_VOICE_SETTINGS;
-}
 
 function synthesizeGroundedResponse(query: string, searchResults: SearchResult[]): string {
   if (searchResults.length === 0) {
@@ -135,12 +92,9 @@ export default function App() {
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isChatPopupOpen, setIsChatPopupOpen] = useState(false);
 
-  // Book & Voice Metadata
+  // Book Metadata
   const [bookMetadata, setBookMetadata] =
     useState<BookMetadata>(defaultBookMetadata);
-  const [voiceSettings, setVoiceSettings] = useState<VoiceSettings>(
-    loadInitialVoiceSettings
-  );
 
   // Modals
   const [activeSourceDetail, setActiveSourceDetail] = useState<Source | null>(
@@ -150,7 +104,6 @@ export default function App() {
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(false);
   const [defaultAddSection, setDefaultAddSection] =
     useState<ArchiveSection>('authored');
-  const [isVoiceSettingsOpen, setIsVoiceSettingsOpen] = useState(false);
   const [isBookSettingsOpen, setIsBookSettingsOpen] = useState(false);
 
   // Strict Google AI Studio Author & Admin detection:
@@ -405,13 +358,6 @@ export default function App() {
       console.warn('Studio archive publish notice:', err);
       setSyncStatus('error');
     }
-  };
-
-  const handleSaveVoiceSettings = (updated: VoiceSettings) => {
-    setVoiceSettings(updated);
-    try {
-      window.localStorage.setItem(VOICE_STORAGE_KEY, JSON.stringify(updated));
-    } catch {}
   };
 
   // 1. Initialize Archive: Sync canonical server archive with local vector store
@@ -910,10 +856,6 @@ export default function App() {
         isOfflineMode={isOfflineMode}
         setIsOfflineMode={setIsOfflineMode}
         bookMetadata={bookMetadata}
-        voiceSettings={voiceSettings}
-        onOpenVoiceSettings={
-          isStudioBuildMode ? () => setIsVoiceSettingsOpen(true) : undefined
-        }
         onOpenBookSettings={
           isStudioBuildMode ? () => setIsBookSettingsOpen(true) : undefined
         }
@@ -975,7 +917,7 @@ export default function App() {
         />
       )}
 
-      {/* VIEW: Book Landing Page Mode (Default Homepage with Conversational Q&A & Voice Player) */}
+      {/* VIEW: Book Landing Page Mode (Default Homepage with Conversational Q&A) */}
       {currentView === 'landing' && (
         <LandingPageView
           bookMetadata={bookMetadata}
@@ -987,10 +929,6 @@ export default function App() {
           onSendMessage={handleSendMessage}
           isChatLoading={isChatLoading}
           onClearChat={() => setMessages([])}
-          voiceSettings={voiceSettings}
-          onOpenVoiceSettings={
-            isStudioBuildMode ? () => setIsVoiceSettingsOpen(true) : undefined
-          }
           chatModel={chatModel}
           onChangeChatModel={setChatModel}
           isOfflineMode={isOfflineMode}
@@ -1005,7 +943,6 @@ export default function App() {
         onSendMessage={handleSendMessage}
         isChatLoading={isChatLoading}
         onClearChat={() => setMessages([])}
-        voiceSettings={voiceSettings}
         isOfflineMode={isOfflineMode}
         onSelectSource={(s) => setActiveSourceDetail(s)}
         sources={sources}
@@ -1083,18 +1020,7 @@ export default function App() {
         />
       )}
 
-      {/* 4. Google Instant Custom Voice Cloning Studio & Settings Modal — visible only in Google AI Studio Build mode */}
-      {isStudioBuildMode && (
-        <VoiceSettingsModal
-          isOpen={isVoiceSettingsOpen}
-          onClose={() => setIsVoiceSettingsOpen(false)}
-          settings={voiceSettings}
-          onSaveSettings={handleSaveVoiceSettings}
-          authorName={bookMetadata.author}
-        />
-      )}
-
-      {/* 5. Book Metadata Settings Modal — visible only in Google AI Studio Build mode */}
+      {/* 4. Book Metadata Settings Modal — visible only in Google AI Studio Build mode */}
       {isStudioBuildMode && (
         <BookSettingsModal
           isOpen={isBookSettingsOpen}

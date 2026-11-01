@@ -103,14 +103,6 @@ export interface StudioArtifact {
   createdAt: number;
 }
 
-export interface AudioOverviewData {
-  title: string;
-  script: string;
-  style: 'podcast' | 'author_monologue';
-  durationEstimateSeconds: number;
-  generatedAt: number;
-}
-
 export interface BookMetadata {
   title: string;
   subtitle: string;
@@ -125,18 +117,3 @@ export interface BookMetadata {
   purchaseUrl?: string;
 }
 
-export interface VoiceSettings {
-  engine: 'cloned_author' | 'browser';
-  voiceName: string;
-  rate: number;
-  pitch: number;
-  volume: number;
-  style: 'author_monologue' | 'podcast';
-  voiceCloningKey?: string;
-  voicePersonaPrompt?: string;
-  prebuiltBaseVoice?: 'Kore' | 'Zephyr' | 'Puck' | 'Charon' | 'Fenrir';
-  referenceAudioDataUrl?: string;
-  consentRecordedAt?: number;
-  isClonedVoiceActive?: boolean;
-  cloudAccessToken?: string;
-}

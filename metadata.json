@@ -1,9 +1,7 @@
 {
   "name": "The Truth About Love",
   "description": "A conversational manuscript for 'The Truth About Love' by Catalina Butnaru. Explore love at the intersection of information theory, philosophy, depth psychology, and cognitive science. ",
-  "requestFramePermissions": [
-    "microphone"
-  ],
+  "requestFramePermissions": [],
   "majorCapabilities": [
     "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
   ]

@@ -6,17 +6,12 @@ import {
   Sparkles,
   Send,
   RotateCcw,
-  Volume2,
-  VolumeX,
   Copy,
   Check,
   ShieldCheck,
   ArrowRight,
 } from 'lucide-react';
-import { ChatMessage, VoiceSettings, Source, ChatModelTier } from '../types';
-import { speechEngine } from '../utils/speechEngine';
-
-const DEFAULT_AUTHOR_VOICE_ID = 'voice_lp7vh3bk6taq';
+import { ChatMessage, Source, ChatModelTier } from '../types';
 
 interface ConversationalPopupWindowProps {
   isOpen: boolean;
@@ -25,7 +20,6 @@ interface ConversationalPopupWindowProps {
   onSendMessage: (query: string) => Promise<void>;
   isChatLoading: boolean;
   onClearChat?: () => void;
-  voiceSettings: VoiceSettings;
   isOfflineMode: boolean;
   onSelectSource?: (source: Source) => void;
   sources: Source[];
@@ -40,7 +34,6 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
   onSendMessage,
   isChatLoading,
   onClearChat,
-  voiceSettings,
   isOfflineMode,
   onSelectSource,
   sources,
@@ -48,16 +41,9 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
   onChangeChatModel,
 }) => {
   const [inputQuery, setInputQuery] = useState('');
-  const [speakingMessageId, setSpeakingMessageId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
-
-  const embeddedAuthorVoiceId =
-    voiceSettings.voiceCloningKey &&
-    !voiceSettings.voiceCloningKey.startsWith('gcv-catalina-author-v1-')
-      ? voiceSettings.voiceCloningKey
-      : DEFAULT_AUTHOR_VOICE_ID;
 
   useEffect(() => {
     if (isOpen) {
@@ -77,34 +63,6 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
     const q = inputQuery.trim();
     setInputQuery('');
     await onSendMessage(q);
-  };
-
-  const handleSpeak = (messageId: string, text: string) => {
-    if (speakingMessageId === messageId) {
-      speechEngine.stop();
-      setSpeakingMessageId(null);
-      return;
-    }
-
-    speechEngine.stop();
-    setSpeakingMessageId(messageId);
-
-    speechEngine.speak(
-      text,
-      {
-        ...voiceSettings,
-        engine: voiceSettings.engine || 'cloned_author',
-        voiceName: embeddedAuthorVoiceId,
-        voiceCloningKey: embeddedAuthorVoiceId,
-        style: 'author_monologue',
-        isClonedVoiceActive: true,
-      },
-      {
-        onStart: () => setSpeakingMessageId(messageId),
-        onEnd: () => setSpeakingMessageId(null),
-        onError: () => setSpeakingMessageId(null),
-      }
-    );
   };
 
   const handleCopy = (id: string, text: string) => {
@@ -335,29 +293,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                       )}
 
                     {message.role === 'assistant' && (
-                      <div className="mt-2.5 pt-2 flex items-center justify-between gap-2 text-[11px]">
-                        <button
-                          onClick={() => handleSpeak(message.id, message.content)}
-                          className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full font-medium transition-colors cursor-pointer ${
-                            speakingMessageId === message.id
-                              ? 'bg-[#FF2A6D] text-white animate-pulse'
-                              : 'bg-[#FF2A6D] text-white hover:bg-[#E61556]'
-                          }`}
-                          title="Read Aloud in Catalina's Embedded Author Voice"
-                        >
-                          {speakingMessageId === message.id ? (
-                            <>
-                              <VolumeX className="w-3 h-3" />
-                              <span>Stop Author Voice</span>
-                            </>
-                          ) : (
-                            <>
-                              <Volume2 className="w-3 h-3" />
-                              <span>Read Aloud (Author Voice)</span>
-                            </>
-                          )}
-                        </button>
-
+                      <div className="mt-2.5 pt-2 flex items-center justify-end gap-2 text-[11px]">
                         <button
                           onClick={() => handleCopy(message.id, message.content)}
                           className="p-1 rounded-full hover:bg-[#F1F3F4] text-[#5F6368] hover:text-[#0B0B0C] transition-colors cursor-pointer"
