@@ -34,6 +34,7 @@ import {
   getSourceImages,
 } from '../types';
 import { isPurgedArchiveSource } from '../utils/vectorStore';
+import { sanitizeExternalUrl } from '../utils/security';
 
 interface ArchivePageViewProps {
   sources: Source[];
@@ -161,11 +162,12 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
     return sources.filter((s) => {
       if (isPurgedArchiveSource(s)) return false;
       const q = searchQuery.toLowerCase().trim();
+      const canSearchRaw = !s.isProtected || isStudioAdmin;
       const matchesSearch =
         !q ||
         s.title.toLowerCase().includes(q) ||
         s.summary.toLowerCase().includes(q) ||
-        s.content.toLowerCase().includes(q) ||
+        (canSearchRaw && s.content.toLowerCase().includes(q)) ||
         (s.author && s.author.toLowerCase().includes(q)) ||
         (s.reference && s.reference.toLowerCase().includes(q)) ||
         s.tags.some((t) => t.toLowerCase().includes(q));
@@ -174,7 +176,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
 
       return matchesSearch && matchesType;
     });
-  }, [sources, searchQuery, selectedType]);
+  }, [sources, searchQuery, selectedType, isStudioAdmin]);
 
   // Split into the two requested archive sections
   const authoredSources = useMemo(
@@ -211,7 +213,8 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
     const authorStr = s.author || bookMetadata.author;
     const yearStr = s.year ? ` (${s.year})` : '';
     const refStr = s.reference ? ` ${s.reference}.` : '';
-    const urlStr = s.externalUrl ? ` Retrieved from ${s.externalUrl}` : '';
+    const safeUrl = sanitizeExternalUrl(s.externalUrl);
+    const urlStr = safeUrl ? ` Retrieved from ${safeUrl}` : '';
     return `${authorStr}${yearStr}. "${s.title}."${refStr}${urlStr}`;
   };
 
@@ -499,6 +502,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                 const IconComponent = config.icon;
                 const cardImages = getSourceImages(source);
                 const primaryImage = cardImages[0];
+                const safeExternalUrl = sanitizeExternalUrl(source.externalUrl);
 
                 return (
                   <div
@@ -713,16 +717,16 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2">
-                          {source.externalUrl && (
+                          {safeExternalUrl && (
                             <a
-                              href={source.externalUrl}
+                              href={safeExternalUrl}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-[11px] font-medium transition-all"
                               title="Open publication link"
                             >
                               <span>
-                                {source.externalUrl.includes('substack.com')
+                                {safeExternalUrl.includes('substack.com')
                                   ? 'Read on Substack'
                                   : 'View Link'}
                               </span>
@@ -830,6 +834,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
               {referenceSources.map((source, index) => {
                 const citation = formatCitation(source);
                 const refImages = getSourceImages(source);
+                const safeExternalUrl = sanitizeExternalUrl(source.externalUrl);
 
                 return (
                   <div
@@ -922,9 +927,9 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                         )}
                       </button>
 
-                      {source.externalUrl && (
+                      {safeExternalUrl && (
                         <a
-                          href={source.externalUrl}
+                          href={safeExternalUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           className="px-3 py-1 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white transition-colors flex items-center gap-1 font-medium"

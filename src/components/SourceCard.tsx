@@ -11,6 +11,7 @@ import {
   Sparkles
 } from 'lucide-react';
 import { Source, SourceType, getSourceImages } from '../types';
+import { sanitizeExternalUrl } from '../utils/security';
 
 interface SourceCardProps {
   source: Source;
@@ -77,6 +78,7 @@ export const SourceCard: React.FC<SourceCardProps> = ({
   const IconComponent = config.icon;
   const cardImages = getSourceImages(source);
   const primaryImage = cardImages[0];
+  const safeExternalUrl = sanitizeExternalUrl(source.externalUrl);
 
   return (
     <div
@@ -193,9 +195,9 @@ export const SourceCard: React.FC<SourceCardProps> = ({
             )}
           </div>
 
-          {source.externalUrl && (
+          {safeExternalUrl && (
             <a
-              href={source.externalUrl}
+              href={safeExternalUrl}
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}

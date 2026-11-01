@@ -32,7 +32,12 @@ import {
   isPurgedArchiveSource,
 } from './utils/vectorStore';
 
-function synthesizeGroundedResponse(query: string, searchResults: SearchResult[]): string {
+function synthesizeGroundedResponse(
+  query: string,
+  searchResults: SearchResult[],
+  allSources: Source[] = [],
+  isStudioAdmin = false
+): string {
   if (searchResults.length === 0) {
     return `Love is not an emotion—it is a fundamental life force and the unifying field of consciousness.\n\nNo direct passage matched "${query}" in the currently selected archive filter. Try selecting all sources in the archive to search across the full manuscript chapters and Substack essays.`;
   }
@@ -41,8 +46,14 @@ function synthesizeGroundedResponse(query: string, searchResults: SearchResult[]
   const second = searchResults[1];
   const third = searchResults[2];
 
-  const cleanExcerpt = (text: string, maxLen = 280) => {
-    const lines = text
+  const getSafeSynthesisSnippet = (sr: SearchResult, maxLen = 280) => {
+    const parent = allSources.find((s) => s.id === sr.chunk.sourceId);
+    const rawText =
+      parent?.isProtected && !isStudioAdmin
+        ? parent.summary || sr.chunk.sourceTitle
+        : sr.chunk.text;
+
+    const lines = rawText
       .split('\n')
       .map((l) => l.trim())
       .filter(
@@ -57,15 +68,15 @@ function synthesizeGroundedResponse(query: string, searchResults: SearchResult[]
       : joined;
   };
 
-  let response = `Drawing directly from **${top.chunk.sourceTitle}** [Source 1]:\n\n"${cleanExcerpt(top.chunk.text, 300)}"\n\n`;
+  let response = `Drawing directly from **${top.chunk.sourceTitle}** [Source 1]:\n\n${getSafeSynthesisSnippet(top, 300)}\n\n`;
 
   if (second) {
-    response += `This connects directly to **${second.chunk.sourceTitle}** [Source 2]:\n\n"${cleanExcerpt(second.chunk.text, 220)}"\n\n`;
+    response += `This connects directly to **${second.chunk.sourceTitle}** [Source 2]:\n\n${getSafeSynthesisSnippet(second, 220)}\n\n`;
   }
 
   response += `- **Core Thesis:** Love is a generative, syntropic life force [Source 1]. Love never wounds; only power distortions, ego projections, and programmatic substitutes create suffering.\n`;
   if (second) {
-    response += `- **Expanded Perspective:** ${cleanExcerpt(second.chunk.text, 140)} [Source 2]\n`;
+    response += `- **Expanded Perspective:** ${getSafeSynthesisSnippet(second, 140)} [Source 2]\n`;
   }
   if (third) {
     response += `- **Further Reading:** Explore **${third.chunk.sourceTitle}** [Source 3] for deeper context.`;
@@ -732,7 +743,12 @@ export default function App() {
     try {
       // 2. If in strict Offline Privacy Mode: synthesize locally without external API calls
       if (isOfflineMode) {
-        const localAnswer = synthesizeGroundedResponse(query, searchResults);
+        const localAnswer = synthesizeGroundedResponse(
+          query,
+          searchResults,
+          sources,
+          isStudioBuildMode
+        );
 
         const assistantMessage: ChatMessage = {
           id: `msg-ai-${Date.now()}`,
@@ -801,7 +817,12 @@ export default function App() {
       }
 
       if (!response.ok || !data || !data.reply) {
-        const fallbackReply = synthesizeGroundedResponse(query, searchResults);
+        const fallbackReply = synthesizeGroundedResponse(
+          query,
+          searchResults,
+          sources,
+          isStudioBuildMode
+        );
         const assistantMessage: ChatMessage = {
           id: `msg-ai-${Date.now()}`,
           role: 'assistant',
@@ -827,7 +848,12 @@ export default function App() {
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch {
-      const fallbackReply = synthesizeGroundedResponse(query, searchResults);
+      const fallbackReply = synthesizeGroundedResponse(
+        query,
+        searchResults,
+        sources,
+        isStudioBuildMode
+      );
       const fallbackMessage: ChatMessage = {
         id: `msg-ai-${Date.now()}`,
         role: 'assistant',
@@ -957,6 +983,7 @@ export default function App() {
             <SemanticSearchPanel
               allChunks={vectorChunks}
               allSources={sources}
+              isStudioAdmin={isStudioBuildMode}
               onAskAboutExcerpt={(excerpt, title) => {
                 setIsSemanticSearchOpen(false);
                 setIsChatPopupOpen(true);

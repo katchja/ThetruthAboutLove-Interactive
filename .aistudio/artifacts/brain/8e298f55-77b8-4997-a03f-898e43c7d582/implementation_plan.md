@@ -1,89 +1,98 @@
-# Deep Burnt Orange Interactive Accent & Button Theme Update
+# Comprehensive Security, Privacy & Data Integrity Audit + Remediation Plan
 
-Replace all pink (`#FF2A6D` / `#E61556`) and legacy rose (`#C85A6E` / `#9E3E50`) UI button fills, active state indicators, badges, and interactive hover accents across *The Truth About Love* with **Deep Burnt Orange (`#C83E0B`)** and a rich hover state (`#A93207`), matching the warm editorial burnt orange of the reference slide (*"Chapter 1"*), while preserving the light yellow and soft pink floating flower and cloud backdrop shapes unchanged.
+## 1. Executive Summary & Audit Findings
 
-## User Review & Critical Decisions
-
-> [!IMPORTANT]
-> The following design decisions were confirmed with you and guide this implementation:
-
-- **Confirmed Decision 1 — Deep Burnt Orange Primary Accent (`#C83E0B`)**: All primary buttons, active model-tier selectors, citation pills, filter tabs, and interactive hover accents will transition from neon pink (`#FF2A6D`) to Deep Burnt Orange (`#C83E0B`) with a darkened pressed/hover state (`#A93207`) and soft warm tint (`#FDF2EE`) where subtle accent surfaces are used in studio editor modals.
-- **Confirmed Decision 2 — Preserve Floating Flower & Cloud Gradients**: The organic 8-petal flower and 3-lobe cloud SVG shapes (`LabsFlowerShape` and `LabsCloudShape`) will retain their current light yellow and soft pink atmospheric mesh gradients so the burnt orange buttons stand out with crisp editorial contrast against the pastel shapes and monochrome canvas.
+A thorough line-by-line review of the backend (`server.ts`), client state and storage (`src/App.tsx`, `src/utils/vectorStore.ts`), and UI components revealed **7 security, privacy, and data-integrity vulnerabilities**. Below is the detailed analysis of each finding and the exact code remediation we will implement.
 
 ---
 
-## 1. Overview & Core Concept
-
-- **What It Does**: Harmonizes the interactive action palette across the entire manuscript companion, conversational studio, floating chat assistant, semantic search drawer, and archive studio modals around a single **Deep Burnt Orange (`#C83E0B`)** accent color.
-- **Target Audience / Persona**: Readers and fierce lovers exploring Catalina Butnaru's interactive manuscript, truths carousel, and reference archive.
-- **Key Value**: Connects the interactive UI buttons directly to the editorial burnt-orange typography from the reference slide while maintaining high-contrast WCAG AA legibility with crisp white button labels (`#FFFFFF`).
-
----
-
-## 2. User Experience & Visual Design
-
-- **Key User Flows**:
-  1. **Truths About Love Carousel**: The primary *"Ask Manuscript"* button beneath each rotating quote is styled in `#C83E0B` burnt orange with `#A93207` hover feedback.
-  2. **Conversational Manuscript Studio**: The model tier selector (*Fast / Balanced / Deep Reasoning*), *"Ask the Manuscript"* submit CTA, instant prompt pill hover states, inline `[Source N]` citation badges, and citation chips all respond in `#C83E0B`.
-  3. **Book Showcase & Five Dimensions of Love**: Primary CTAs (*"Ask Manuscript"*, *"Begin Practical Exercises"*, *"Talk to the manuscript"*, *"Explore (N)"*) use `#C83E0B` burnt orange against the crisp `#FFFFFF`, `#F8F9FA`, and `#0B0B0C` surfaces.
-  4. **Interactive Archive & Modals**: Active type filter tabs, *"The Truth About Love"* return pill, *"Ask Manuscript"* card actions, external Substack/source links, semantic search triggers, and author studio modals use `#C83E0B` burnt orange consistently.
-- **Visual Identity & Theme**:
-  - *Aesthetic Direction*: Google Labs editorial minimalism meets warm curatorial monograph.
-  - *Color Palette & Mood*:
-    - `--background`: `#FFFFFF` (Primary canvas) / `#F8F9FA` & `#F4F4F9` (Secondary architectural surfaces)
-    - `--foreground`: `#0B0B0C` & `#1E1F18` (High-contrast ink)
-    - `--primary`: `#C83E0B` (Deep Burnt Orange for all primary buttons, active toggles, and interactive accents)
-    - `--primary-hover`: `#A93207` (Rich darkened burnt orange on hover/active states)
-    - `--accent-subtle`: `#FDF2EE` (Warm tinted surface for active studio modal selection states)
-  - *Typography & Hierarchy*: Retains `Google Sans Display` for headlines and quotes, `Google Sans Text` for prose and UI controls, and `Google Sans Mono` for archival metadata and citations.
+### Finding 1 (Critical — Data Integrity & Unauthorized Modification): Spoofable Admin Check (`isStudioAdminRequest`)
+- **Vulnerability:** In `server.ts` (lines 855–875), `isStudioAdminRequest(req)` relies primarily on client-supplied headers (`x-studio-admin: true`, `x-client-hostname`, `Origin`, and `Referer`) and returns `true` whenever `x-studio-admin: true` is sent without `ais-pre-` in those client headers. Any external script or `curl` request to the public shared URL (`ais-pre-...`) can spoof those headers to overwrite, corrupt, or delete the entire canonical archive via `POST /api/archive/sync`, `POST /api/archive/source`, `DELETE /api/archive/source/:id`, or `POST /api/archive/metadata`.
+- **Remediation:**
+  1. Validate the **server-side Host header** (`req.headers['x-forwarded-host'] || req.headers.host`) in `isStudioAdminRequest(req)`. If the server's own host starts with `ais-pre-` (the public shared deployment), unconditionally reject all admin write and OCR requests (`false`), regardless of what `Origin`, `Referer`, or `x-client-hostname` claims.
+  2. Require the server host to match either the `ais-dev-` development host or local loopback (`localhost` / `127.0.0.1`), in addition to `x-studio-admin: 'true'` and Same-Origin verification.
 
 ---
 
-## 3. Key Product Decisions & Trade-Offs
-
-- **Decision 1: Unified Burnt Orange Token Across Public & Studio Surfaces**
-  - *Chosen Approach*: Replace both the `#FF2A6D` neon pink on reader-facing views and the remaining `#C85A6E` / `#9E3E50` rose tones inside the Archive Card, Source Detail, Add/Edit Source, and Book Settings modals with the unified `#C83E0B` / `#A93207` burnt orange palette.
-  - *Why*: Eliminates any leftover pink/rose visual drift across modals and secondary states so the entire application feels cohesive.
-  - *Alternatives Considered*: Updating only the landing page buttons; rejected because the user requested replacing pink with burnt orange across all buttons and accents.
-- **Decision 2: Untouched Pastel Flower & Cloud Shapes**
-  - *Chosen Approach*: Keep `LabsFlowerShape` and `LabsCloudShape` gradients in their existing light yellow and soft blush-pink palette.
-  - *Why*: Matches the reference presentation where bold `#C83E0B` burnt orange elements sit alongside soft yellow-and-pink organic flower shapes.
+### Finding 2 (High — Privacy & Intellectual Property Leak): Protected Manuscript (`isProtected`) Raw Text Exposed in Public UI
+- **Vulnerability:** Sources have an `isProtected?: boolean` flag ("Protected Manuscript — Hide raw text from public; index for AI only"). However:
+  - In `src/components/SourceDetailModal.tsx` (lines 189–198, 226–232, 419–469), public visitors (`!isAdmin`) can still click the **Indexed Content Passages (`raw`)** tab, view all verbatim book chunks, click **Copy Passage** or **Copy Full Text**, and view full **OCR Raw Transcriptions** (`ocr` tab) even when `source.isProtected === true`.
+  - In `src/components/SemanticSearchPanel.tsx`, verbatim passage excerpts from protected sources are displayed in full in raw search cards to non-admin users.
+- **Remediation (Per Your Preference — Hide Raw Text in UI Only for Protected Sources):**
+  1. Keep full source content available in memory so client-side semantic vector indexing and grounded AI synthesis continue working seamlessly.
+  2. In `src/components/SourceDetailModal.tsx`, when `source.isProtected && !isAdmin`:
+     - Hide the **Indexed Content Passages (`raw`)** tab and the **Copy Full Text** button.
+     - Redact `rawTranscription` and `verbatimQuotes` inside the `ocr` and `overview` tabs for non-admin visitors, displaying a clear **"Protected Manuscript — Indexed for AI Synthesis Only"** notice while preserving the AI Summary, Structural Breakdown, Entities, Key Themes, and Citation Generator.
+  3. In `src/components/SemanticSearchPanel.tsx`, when a matched passage belongs to a source with `isProtected && !isAdmin`, show the source title, relevance score, and AI summary/theme metadata instead of exposing the verbatim raw manuscript chunk, prompting the visitor to explore the concept via the Conversational Archive AI.
 
 ---
 
-## 4. Technical Architecture & Data Strategy *(Technical Reference)*
+### Finding 3 (High — Attack Surface & API Quota Abuse): Exposed Legacy Endpoints & Unauthenticated `/api/ocr`
+- **Vulnerability:**
+  - `server.ts` still exposes unused legacy endpoints (`POST /api/voice-clone/create`, `DELETE /api/voice-clone/:voiceId`, `POST /api/tts/synthesize`, `POST /api/audio-overview`, `POST /api/generate-artifact`, and the `/live` WebSocket proxy) even though the Author Voice and audio features were removed from the UI.
+  - `POST /api/ocr` accepts up to 100MB payloads and invokes Gemini Vision without checking `isStudioAdminRequest(req)`, allowing any anonymous visitor to consume Gemini API quota for arbitrary OCR tasks.
+- **Remediation:**
+  1. Remove all unused audio/voice/live/artifact endpoints and the `/live` WebSocket server from `server.ts`, as well as unused client voice storage helpers (`src/utils/authorVoiceStorage.ts` and unused modal components).
+  2. Lock down `POST /api/ocr` with `isStudioAdminRequest(req)` so only the author in the Studio Admin environment can run document/photo OCR.
 
-- **Architecture & Component Diagram**:
+---
 
-```
-┌────────────────────────────────────────────────────────────────────────────┐
-│                   GLOBAL THEME & ACCENT TOKEN LAYER                        │
-│     Primary Button / Accent: #C83E0B   |   Hover / Active: #A93207         │
-│     Subtle Accent Tint:      #FDF2EE   |   Focus Ring:     #C83E0B/30      │
-└───────────────────────────────────┬────────────────────────────────────────┘
-                                    │
-        ┌───────────────────────────┼───────────────────────────┐
-        ▼                           ▼                           ▼
-┌──────────────────────┐  ┌──────────────────────┐  ┌────────────────────────┐
-│  GLOBAL SHELL & NAV  │  │  MANUSCRIPT LANDING  │  │  ARCHIVE & SEARCH      │
-│  ──────────────────  │  │  ──────────────────  │  │  ────────────────────  │
-│  • Header Bar        │  │  • Truths Carousel   │  │  • Archive Filter Tabs │
-│    - Publish Button  │  │    "Ask Manuscript"  │  │  • Return Home Pill    │
-│    - Search Toggle   │  │  • Studio Composer   │  │  • Card "Ask" & Link   │
-│    - Privacy Toggle  │  │    - Model Selector  │  │    Buttons             │
-│  • Floating Chat     │  │    - Instant Prompts │  │  • Semantic Search     │
-│    Popup Window      │  │    - Citation Pills  │  │     Drawer & Filters    │
-│    - Launcher Pill   │  │  • Book Showcase CTA │  │  • Source Detail,      │
-│    - Model Tabs      │  │  • 5 Dimensions CTAs │  │    Add/Edit & Settings │
-│    - Citation Chips  │  │  • Archive Callout   │  │    Studio Modals       │
-└──────────────────────┘  └──────────────────────┘  └────────────────────────┘
-```
+### Finding 4 (High — Denial of Service & Cost Exhaustion): Global 100MB JSON Limit & Unbounded Public `/api/chat`
+- **Vulnerability:**
+  - `app.use(express.json({ limit: '100mb' }))` is applied globally to every route, allowing attackers to send 100MB JSON payloads to `/api/chat` and exhaust server memory.
+  - `POST /api/chat` has no rate limiting, no maximum message/context length validation, and accepts arbitrary model names or unbounded conversation histories from the client.
+- **Remediation:**
+  1. Set the default global `express.json({ limit: '512kb' })` for public routes, and apply a scoped higher limit (`25mb`) only to authenticated Studio Admin routes (`/api/ocr`, `/api/archive/*`).
+  2. Add an in-memory per-IP sliding-window rate limiter on `/api/chat` (e.g., max 20 requests per minute per IP) and `/api/archive` write routes.
+  3. Enforce strict input bounds on `/api/chat`: cap `message` length (max 2,000 characters), cap `history` to the last 10 turns (max 1,500 characters per turn), cap `context` length (max 25,000 characters), and hardcode/whitelist the allowed Gemini model on the server so clients cannot request expensive arbitrary models.
+  4. Harden the system instruction in `/api/chat` against prompt injection so users cannot trick the assistant into dumping verbatim protected passages or ignoring grounding rules.
 
-- **Interactive Component & State Mapping**:
-  - **Header Navigation**: Active states for *"Search"*, *"Offline Privacy"*, and *"Publish to Public"* buttons transition to `bg-[#C83E0B] hover:bg-[#A93207] text-white`.
-  - **Landing Page View**:
-    - Section 1 Truths Carousel *"Ask Manuscript"* button (`button:nth-of-type(1)`) uses `bg-[#C83E0B] hover:bg-[#A93207]`.
-    - Section 2 Conversational Studio active model tier buttons, *"New Conversation"* / *"Go back"* buttons, *"Ask the Manuscript"* submit button, instant prompt hover fills (`hover:bg-[#C83E0B]`), inline citation buttons, and citation chips use `#C83E0B`.
-    - Section 3 Book Showcase *"Ask Manuscript"*, Section 5 Five Dimensions action buttons, and Section 6 Interactive Archive *"Explore"* button use `bg-[#C83E0B] hover:bg-[#A93207]`.
-  - **Floating Conversational Popup & Semantic Search**: Floating launcher button, close button hover, active model tier pills, suggested inquiry hover states, citation chips, and search submit/filter controls use `#C83E0B` and `#A93207`.
-  - **Archive View & Studio Modals**: Active category filters, *"Add to Archive"* / *"Add Authored Work"* / *"Add Reference"* buttons, *"Ask Manuscript"* and external link buttons, and form focus/selection accents in `SourceCard`, `SourceDetailModal`, `AddSourceModal`, `EditSourceModal`, and `BookSettingsModal` use `#C83E0B` and `#A93207`.
+---
+
+### Finding 5 (Medium — Data Integrity & Corruption Risk): Non-Atomic File Writes & Unvalidated Sync Schema
+- **Vulnerability:**
+  - `writeArchiveStore` in `server.ts` writes directly to `archive-store.json` and `public/archive-store.json` via `fs.writeFileSync`. If the process restarts mid-write or receives malformed data in `/api/archive/sync`, the canonical JSON file can be truncated or corrupted.
+  - Static file serving currently allows `/archive-store.json` to be served directly before custom middleware headers, and `writeArchiveStore` does not validate item schemas or maintain a `.bak` recovery file.
+- **Remediation:**
+  1. Implement **atomic writes**: write to a temporary file (`archive-store.json.tmp`) first, verify JSON serialization, create a rolling backup (`archive-store.json.bak`), and atomically rename (`fs.renameSync`) over `archive-store.json` and `public/archive-store.json`.
+  2. Add automatic fallback to `archive-store.json.bak` in `readArchiveStore()` if the primary file is ever unreadable.
+  3. Validate and sanitize all `Source` and `BookMetadata` fields on the server before persisting (enforcing string types, max lengths, valid category enums, and boolean flags).
+
+---
+
+### Finding 6 (Medium — XSS & Unsafe URI Schemes): Unsanitized `externalUrl`, `purchaseUrl`, and Image Sources
+- **Vulnerability:**
+  - `source.externalUrl`, `bookMetadata.purchaseUrl`, and `source.imageUrl` / `source.images` are rendered directly into `<a href={...}>` and `<img src={...}>` across `LandingPageView.tsx`, `SourceDetailModal.tsx`, and `SourceCard.tsx`. A `javascript:` or `data:text/html` URI could execute script in the browser.
+- **Remediation:**
+  1. Create a shared `sanitizeUrl(url)` and `sanitizeImageSrc(src)` utility in `src/utils/security.ts` (and mirror it on `server.ts`) that strictly permits only `https://`, `http://`, or safe local `/assets/` paths for links, and `https://`, `http://`, `/assets/`, or `data:image/(png|jpeg|jpg|webp|gif);base64,` for images.
+  2. Apply `sanitizeUrl` and `rel="noopener noreferrer"` to all external links across the application.
+
+---
+
+### Finding 7 (Low — Missing HTTP Security Headers): Hardening Express Response Headers
+- **Vulnerability:** `server.ts` does not set baseline security headers (`X-Content-Type-Options`, `Referrer-Policy`, `Permissions-Policy`, `X-XSS-Protection`).
+- **Remediation:**
+  1. Add a security headers middleware in `server.ts` setting `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, and `Permissions-Policy: microphone=(), camera=(), geolocation=()` (while preserving iframe compatibility required by the AI Studio preview environment).
+
+---
+
+## 2. Implementation Steps
+
+1. **Create `src/utils/security.ts`:**
+   - Implement `sanitizeExternalUrl`, `sanitizeImageSrc`, and text-length bounds helpers for client and server use.
+2. **Harden `server.ts`:**
+   - Remove unused legacy endpoints (`/api/voice-clone/*`, `/api/tts/*`, `/api/audio-overview`, `/api/generate-artifact`, `/live` WebSocket server).
+   - Upgrade `isStudioAdminRequest(req)` to verify the server's own `Host` / `X-Forwarded-Host` header and block any admin action on `ais-pre-*`.
+   - Protect `POST /api/ocr` with `isStudioAdminRequest(req)`.
+   - Replace the global `100mb` JSON parser with a `512kb` default limit and a `25mb` parser scoped only to admin routes.
+   - Add per-IP sliding-window rate limiting and strict payload/model validation on `POST /api/chat`, plus anti-prompt-injection guardrails for protected manuscripts.
+   - Upgrade `writeArchiveStore` and `readArchiveStore` with schema sanitization, atomic `.tmp` -> rename writes, and `.bak` automatic backup recovery.
+   - Add HTTP security headers middleware.
+3. **Enforce Protected Manuscript (`isProtected`) Privacy in UI:**
+   - Update `src/components/SourceDetailModal.tsx` to hide the `raw` passages tab, full-text copy buttons, raw OCR transcriptions, and verbatim quotes when `source.isProtected && !isAdmin`.
+   - Update `src/components/SemanticSearchPanel.tsx` and `src/App.tsx` so protected sources never dump raw verbatim manuscript chunks to public visitors while still powering grounded AI synthesis.
+4. **Sanitize External Links & Clean Up Dead Code:**
+   - Apply `sanitizeExternalUrl` and `sanitizeImageSrc` in `LandingPageView.tsx`, `SourceDetailModal.tsx`, and `SourceCard.tsx`.
+   - Remove unused `src/utils/authorVoiceStorage.ts`.
+5. **Verification:**
+   - Run `compile_applet` and `lint_applet` to ensure zero build or TypeScript errors.

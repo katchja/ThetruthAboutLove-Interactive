@@ -13,6 +13,7 @@ import {
   ImagePlus,
 } from 'lucide-react';
 import { Source, getSourceImages } from '../types';
+import { sanitizeExternalUrl } from '../utils/security';
 
 interface SourceDetailModalProps {
   source: Source | null;
@@ -46,8 +47,10 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
 
   if (!source) return null;
 
+  const canViewRawText = !source.isProtected || isStudioAdmin;
+  const safeExternalUrl = sanitizeExternalUrl(source.externalUrl);
   const allImages = getSourceImages(source);
-  const activeImage = allImages[selectedImageIdx] || allImages[0] || source.imageUrl;
+  const activeImage = allImages[selectedImageIdx] || allImages[0];
 
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text).catch(() => {});
@@ -183,19 +186,23 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              Pictures &amp; Transcription ({allImages.length})
+              {canViewRawText
+                ? `Pictures & Transcription (${allImages.length})`
+                : `Pictures (${allImages.length})`}
             </button>
           )}
-          <button
-            onClick={() => setActiveTab('raw')}
-            className={`py-2 px-3 rounded-lg transition-colors ${
-              activeTab === 'raw'
-                ? 'bg-[#C83E0B] text-white font-semibold'
-                : 'hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
-            }`}
-          >
-            Indexed Content Passages
-          </button>
+          {canViewRawText && (
+            <button
+              onClick={() => setActiveTab('raw')}
+              className={`py-2 px-3 rounded-lg transition-colors ${
+                activeTab === 'raw'
+                  ? 'bg-[#C83E0B] text-white font-semibold'
+                  : 'hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
+              }`}
+            >
+              Indexed Content Passages
+            </button>
+          )}
         </div>
 
         {/* Modal Content */}
@@ -228,7 +235,7 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                       className="text-xs text-[#C83E0B] hover:underline flex items-center gap-1 font-medium"
                     >
                       <ZoomIn className="w-3.5 h-3.5" />
-                      View High-Res &amp; Transcription
+                      {canViewRawText ? 'View High-Res & Transcription' : 'View High-Res Picture'}
                     </button>
                   </div>
 
@@ -309,30 +316,30 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
               </div>
 
               {/* External Link Section */}
-              {source.externalUrl && (
+              {safeExternalUrl && (
                 <div className="p-4 rounded-xl bg-[#F8F9FA] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
                     <h4 className="text-sm font-display font-semibold text-[#0B0B0C]">
-                      {source.externalUrl.includes('substack.com')
+                      {safeExternalUrl.includes('substack.com')
                         ? 'Published on The Truth About Love Substack'
                         : source.type === 'book'
                         ? 'External Book Reference'
                         : 'External Publication Source'}
                     </h4>
                     <p className="text-xs text-[#5F6368] mt-0.5">
-                      {source.externalUrl.includes('substack.com')
+                      {safeExternalUrl.includes('substack.com')
                         ? 'Read Catalina Butnaru’s full essay, reader discussions, and subscribe on Substack.'
                         : 'Readers can purchase or read the full primary work at the publisher’s portal.'}
                     </p>
                   </div>
                   <a
-                    href={source.externalUrl}
+                    href={safeExternalUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-semibold transition-all shrink-0 self-start sm:self-auto"
                   >
                     <span>
-                      {source.externalUrl.includes('substack.com')
+                      {safeExternalUrl.includes('substack.com')
                         ? 'Read on Substack'
                         : source.type === 'book'
                         ? 'Buy Book'
@@ -415,34 +422,51 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
                 )}
               </div>
 
-              {/* Transcription side */}
+              {/* Transcription or Protected Notice side */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-mono font-semibold text-[#5F6368] uppercase tracking-wider flex items-center gap-1">
-                    <Sparkles className="w-3.5 h-3.5 text-[#0B0B0C]" />
-                    Passages &amp; Transcription
-                  </h4>
-                  <button
-                    onClick={() => handleCopy(source.ocrData?.rawTranscription || source.content)}
-                    className="text-xs text-[#5F6368] hover:text-[#0B0B0C] flex items-center gap-1"
-                  >
-                    {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
-                    <span>{copied ? 'Copied' : 'Copy'}</span>
-                  </button>
-                </div>
-                <div className="p-3.5 rounded-xl bg-[#F8F9FA] text-xs font-mono whitespace-pre-wrap text-[#202124] max-h-80 overflow-y-auto leading-relaxed">
-                  {source.ocrData?.rawTranscription || source.content}
-                </div>
-                {source.ocrData?.detectedPage && (
-                  <p className="text-[11px] text-[#5F6368] font-mono">
-                    Detected Page: #{source.ocrData.detectedPage}
-                  </p>
+                {canViewRawText ? (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-mono font-semibold text-[#5F6368] uppercase tracking-wider flex items-center gap-1">
+                        <Sparkles className="w-3.5 h-3.5 text-[#0B0B0C]" />
+                        Passages &amp; Transcription
+                      </h4>
+                      <button
+                        onClick={() => handleCopy(source.ocrData?.rawTranscription || source.content)}
+                        className="text-xs text-[#5F6368] hover:text-[#0B0B0C] flex items-center gap-1"
+                      >
+                        {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                        <span>{copied ? 'Copied' : 'Copy'}</span>
+                      </button>
+                    </div>
+                    <div className="p-3.5 rounded-xl bg-[#F8F9FA] text-xs font-mono whitespace-pre-wrap text-[#202124] max-h-80 overflow-y-auto leading-relaxed">
+                      {source.ocrData?.rawTranscription || source.content}
+                    </div>
+                    {source.ocrData?.detectedPage && (
+                      <p className="text-[11px] text-[#5F6368] font-mono">
+                        Detected Page: #{source.ocrData.detectedPage}
+                      </p>
+                    )}
+                  </>
+                ) : (
+                  <div className="p-4 rounded-xl bg-[#F8F9FA] space-y-3">
+                    <div className="flex items-center gap-1.5 text-xs font-mono font-semibold text-[#0B0B0C]">
+                      <ShieldCheck className="w-4 h-4 text-[#C83E0B]" />
+                      <span>Protected Manuscript — Indexed for AI Synthesis</span>
+                    </div>
+                    <p className="text-xs text-[#5F6368] leading-relaxed">
+                      Full raw text for this work is preserved inside the private vector index to protect intellectual property. You can explore its ideas and ask questions in the Conversational Manuscript.
+                    </p>
+                    <div className="p-3 rounded-lg bg-[#FFFFFF] text-xs text-[#202124] leading-relaxed">
+                      {source.summary}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
           )}
 
-          {activeTab === 'raw' && (
+          {activeTab === 'raw' && canViewRawText && (
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>

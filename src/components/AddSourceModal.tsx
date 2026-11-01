@@ -14,6 +14,7 @@ import {
   Quote
 } from 'lucide-react';
 import { Source, SourceType, ArchiveSection } from '../types';
+import { getStudioAdminHeaders } from '../utils/security';
 
 interface AddSourceModalProps {
   isOpen: boolean;
@@ -110,7 +111,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
     try {
       const response = await fetch('/api/ocr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getStudioAdminHeaders(),
         body: JSON.stringify({ imageBase64, mimeType, filename }),
       });
 

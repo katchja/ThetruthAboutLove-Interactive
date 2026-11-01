@@ -23,6 +23,7 @@ import {
   getSourceSection,
   getSourceImages,
 } from '../types';
+import { getStudioAdminHeaders } from '../utils/security';
 
 interface EditSourceModalProps {
   source: Source | null;
@@ -160,7 +161,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
     try {
       const response = await fetch('/api/ocr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getStudioAdminHeaders(),
         body: JSON.stringify({
           imageBase64: primaryImage,
           mimeType: 'image/jpeg',

@@ -18,6 +18,7 @@ interface SemanticSearchPanelProps {
   onAskAboutExcerpt: (text: string, sourceTitle: string) => void;
   onSelectSource: (sourceId: string) => void;
   onClose: () => void;
+  isStudioAdmin?: boolean;
 }
 
 export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
@@ -26,6 +27,7 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
   onAskAboutExcerpt,
   onSelectSource,
   onClose,
+  isStudioAdmin = false,
 }) => {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -189,6 +191,12 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
 
         {results.map((res) => {
           const matchPercent = Math.round(res.similarity * 100);
+          const parentSource = allSources.find((s) => s.id === res.chunk.sourceId);
+          const isProtectedForVisitor = Boolean(parentSource?.isProtected && !isStudioAdmin);
+          const displayExcerpt = isProtectedForVisitor
+            ? parentSource?.summary || 'Protected manuscript passage indexed for AI synthesis.'
+            : res.chunk.text;
+
           return (
             <div
               key={res.chunk.id}
@@ -210,6 +218,12 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
                       • {res.chunk.reference}
                     </span>
                   )}
+                  {isProtectedForVisitor && (
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#E8EAED] text-[#5F6368] font-mono text-[10px]">
+                      <ShieldCheck className="w-2.5 h-2.5 text-[#0B0B0C]" />
+                      Protected
+                    </span>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
@@ -225,9 +239,9 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
                 </div>
               </div>
 
-              {/* Passage text */}
+              {/* Passage text or Protected Vetted Summary */}
               <p className="text-xs text-[#202124] font-sans leading-relaxed pl-2">
-                "{res.chunk.text}"
+                {isProtectedForVisitor ? displayExcerpt : `"${displayExcerpt}"`}
               </p>
 
               {/* Matched terms tags and ask action */}
@@ -242,7 +256,14 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
                 </div>
 
                 <button
-                  onClick={() => onAskAboutExcerpt(res.chunk.text, res.chunk.sourceTitle)}
+                  onClick={() =>
+                    onAskAboutExcerpt(
+                      isProtectedForVisitor
+                        ? `the concepts of ${res.matchedTerms.join(', ') || query}`
+                        : res.chunk.text,
+                      res.chunk.sourceTitle
+                    )
+                  }
                   className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white font-medium transition-colors"
                 >
                   <span>Ask Manuscript about this</span>

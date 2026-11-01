@@ -1,3 +1,5 @@
+import { sanitizeImageSrc } from '../utils/security';
+
 export type SourceType = 'chapter' | 'article' | 'note' | 'scan' | 'citation' | 'book';
 export type ArchiveSection = 'authored' | 'references';
 export type AppView = 'landing' | 'archive';
@@ -36,11 +38,13 @@ export function getSourceImages(source: Source): string[] {
   const list: string[] = [];
   if (source.images && Array.isArray(source.images)) {
     for (const img of source.images) {
-      if (img && !list.includes(img)) list.push(img);
+      const safe = sanitizeImageSrc(img);
+      if (safe && !list.includes(safe)) list.push(safe);
     }
   }
-  if (source.imageUrl && !list.includes(source.imageUrl)) {
-    list.unshift(source.imageUrl);
+  const safePrimary = sanitizeImageSrc(source.imageUrl);
+  if (safePrimary && !list.includes(safePrimary)) {
+    list.unshift(safePrimary);
   }
   return list;
 }
