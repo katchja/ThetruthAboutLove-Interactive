@@ -35,6 +35,7 @@ import {
 } from '../types';
 import { isPurgedArchiveSource } from '../utils/vectorStore';
 import { sanitizeExternalUrl } from '../utils/security';
+import { Labs3DBlobShape, LabsFlowerShape } from './LabsFloatingShapes';
 
 interface ArchivePageViewProps {
   sources: Source[];
@@ -275,8 +276,18 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
   return (
     <div className="min-h-screen bg-[#FFFFFF] text-[#0B0B0C] font-sans pb-24">
       {/* Top Banner & Header */}
-      <div className="bg-[#F8F9FA]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
+      <div className="relative overflow-hidden bg-[#F8F9FA]">
+        {/* Corner-Offset Floating Shapes away from header copy */}
+        <Labs3DBlobShape
+          variant="tilted"
+          className="hidden lg:block absolute -right-24 -top-20 w-[260px] h-[260px] opacity-65 labs-shape-float-rotate"
+        />
+        <LabsFlowerShape
+          variant="soft-bloom"
+          className="hidden xl:block absolute -left-28 -bottom-28 w-[240px] h-[240px] opacity-55 labs-shape-float-breathe"
+        />
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
             <div className="space-y-3">
               <div className="flex items-center gap-2.5 flex-wrap">

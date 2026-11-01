@@ -232,3 +232,42 @@ export const LabsCloudShape: React.FC<LabsShapeProps> = ({
     </svg>
   );
 };
+
+interface Labs3DBlobShapeProps {
+  className?: string;
+  variant?: 'default' | 'tilted' | 'mirrored';
+}
+
+const BLOB_3D_ASSET_SRC = '/assets/aistudio/39_0e8514b5.png';
+
+/**
+ * 3D Golden Sculptural Organic Blob asset (/assets/aistudio/39_0e8514b5.png).
+ * Uses radial edge feathering + multiply blending so it floats seamlessly on
+ * any light or pastel canvas without visible bounding edges.
+ */
+export const Labs3DBlobShape: React.FC<Labs3DBlobShapeProps> = ({
+  className = '',
+  variant = 'default',
+}) => {
+  const orientationClass =
+    variant === 'tilted'
+      ? 'rotate-45 scale-105'
+      : variant === 'mirrored'
+      ? '-scale-x-100 -rotate-12'
+      : '';
+
+  return (
+    <div
+      className={`pointer-events-none select-none ${className}`}
+      aria-hidden="true"
+    >
+      <img
+        src={BLOB_3D_ASSET_SRC}
+        alt=""
+        draggable={false}
+        className={`w-full h-full object-contain labs-3d-blob ${orientationClass}`}
+      />
+    </div>
+  );
+};
+

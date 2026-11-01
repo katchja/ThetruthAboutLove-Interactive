@@ -13,7 +13,7 @@ import {
   MessageSquare
 } from 'lucide-react';
 import { BookMetadata, Source, ChatMessage, Citation, ChatModelTier, getSourceSection } from '../types';
-import { LabsFlowerShape, LabsCloudShape } from './LabsFloatingShapes';
+import { LabsFlowerShape, LabsCloudShape, Labs3DBlobShape } from './LabsFloatingShapes';
 
 const BOOK_COVER_SRC = '/assets/aistudio/Book_cover_8c0e35cc.png';
 
@@ -239,27 +239,28 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           SECTION 1: ROTATING "TRUTHS ABOUT LOVE" CAROUSEL (Google Labs Aesthetic)
           ======================================================================== */}
       <section className="relative overflow-hidden pt-20 pb-24 bg-[#F4F4F9]/65">
-        {/* Centered / Offset 3-Lobe Cloud Gradient Backdrop behind Headline (Reference Slide 2) */}
-        <div
-          className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
-          aria-hidden="true"
-        >
-          <LabsCloudShape
-            variant="yellow-pink"
-            className="w-[460px] sm:w-[640px] md:w-[740px] h-[420px] sm:h-[580px] md:h-[660px] opacity-90 labs-shape-float-breathe -translate-y-2 sm:translate-x-4"
-          />
-        </div>
-
-        {/* Secondary Floating 8-Petal Flower Shape on Upper Left Margin */}
-        <LabsFlowerShape
-          variant="pink-yellow"
-          className="hidden lg:block absolute -left-24 -top-20 w-[260px] h-[260px] opacity-75 labs-shape-float-rotate"
+        {/* Outer-Left Margin Cloud Gradient Backdrop — offset away from central quote for crisp readability */}
+        <LabsCloudShape
+          variant="yellow-pink"
+          className="absolute -left-32 sm:-left-20 -bottom-28 w-[380px] sm:w-[500px] md:w-[560px] h-[350px] sm:h-[460px] md:h-[510px] opacity-75 labs-shape-float-breathe"
         />
 
-        {/* Secondary Floating 8-Petal Flower Shape on Lower Right Margin */}
+        {/* Upper-Left Outer Margin 8-Petal Flower Shape */}
+        <LabsFlowerShape
+          variant="pink-yellow"
+          className="hidden md:block absolute -left-24 -top-24 w-[250px] lg:w-[290px] h-[250px] lg:h-[290px] opacity-70 labs-shape-float-rotate"
+        />
+
+        {/* Upper-Right Outer Margin 3D Golden Sculptural Blob */}
+        <Labs3DBlobShape
+          variant="default"
+          className="absolute -right-24 sm:-right-16 lg:-right-10 -top-16 sm:-top-14 w-[240px] sm:w-[320px] lg:w-[380px] h-[240px] sm:h-[320px] lg:h-[380px] opacity-85 labs-shape-float-rotate"
+        />
+
+        {/* Lower-Right Outer Corner 8-Petal Flower Shape */}
         <LabsFlowerShape
           variant="soft-bloom"
-          className="hidden md:block absolute -right-20 -bottom-24 w-[240px] h-[240px] opacity-70 labs-shape-slow-spin"
+          className="hidden sm:block absolute -right-24 -bottom-28 w-[240px] lg:w-[280px] h-[240px] lg:h-[280px] opacity-65 labs-shape-slow-spin"
         />
 
         <div className="relative z-10 max-w-5xl mx-auto px-6 sm:px-8 lg:px-12 text-center">
@@ -313,7 +314,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   </span>
                 </div>
                 <h2 className="text-2xl sm:text-3xl lg:text-4xl font-display font-normal text-[#0B0B0C] tracking-tight leading-snug">
-                  Talk with The Truth About Love book
+                  Chat with The Truth About Love
                 </h2>
                 <p className="text-sm sm:text-base text-[#5F6368] leading-relaxed pt-1 font-sans">
                   Chat with the manuscript. Every response is grounded in the author's manuscript, author notes, research literature and research.
@@ -360,17 +361,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                     Deep Reasoning
                   </button>
                 </div>
-
-                {messages.length > 0 && onClearChat && (
-                  <button
-                    onClick={onClearChat}
-                    className="px-4 py-2.5 text-xs font-medium text-white bg-[#C83E0B] hover:bg-[#A93207] flex items-center gap-2 rounded-full transition-colors cursor-pointer"
-                    title="Clear conversation and return to guided topics"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                    <span>New Conversation</span>
-                  </button>
-                )}
               </div>
             </div>
           </div>
@@ -446,7 +436,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-mono uppercase tracking-wider font-medium text-[#5F6368]">
-                  Instant prompts — click to chat with the Manuscript:
+                  Manuscript prompts
                 </span>
               </div>
               <div className="flex flex-wrap items-center gap-3">
@@ -622,7 +612,13 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           SECTION 3: THE TRUTH ABOUT LOVE & BOOK INTRODUCTION SECTION
           ======================================================================== */}
       <section className="relative overflow-hidden py-20 bg-[#FFFFFF]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Subtle Corner-Offset 3D Golden Blob in Far Right Margin (away from left manifesto copy) */}
+        <Labs3DBlobShape
+          variant="tilted"
+          className="hidden lg:block absolute -right-32 -bottom-20 w-[320px] h-[320px] opacity-60 labs-shape-float-breathe"
+        />
+
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-14 items-center">
             {/* Left copy in Catalina's tone: brief, punchy, fierce */}
             <div className="lg:col-span-7 space-y-8">
@@ -705,20 +701,26 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
       </section>
 
       {/* ========================================================================
-          SECTION 4: THE FIERCE LOVERS MANIFESTO CALLOUT (Google Labs Light Canvas + Giant Flower Backdrop)
+          SECTION 4: THE FIERCE LOVERS MANIFESTO CALLOUT (Google Labs Light Canvas + Giant Flower & 3D Blob)
           ======================================================================== */}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-16">
         <div className="p-10 sm:p-16 lg:p-20 rounded-[2.5rem] bg-[#F3F3FA] text-[#0B0B0C] relative overflow-hidden">
-          {/* Giant Edge-Cropped 8-Petal Scalloped Flower on Right (Reference Slide 1: "Chapter 1") */}
+          {/* Giant Edge-Cropped 8-Petal Scalloped Flower pushed into Far Right Margin for clear text readability */}
           <LabsFlowerShape
             variant="yellow-pink"
-            className="absolute -right-28 sm:-right-36 lg:-right-28 -top-16 sm:-top-24 w-[380px] sm:w-[560px] lg:w-[650px] h-[380px] sm:h-[560px] lg:h-[650px] opacity-95 labs-shape-float-rotate"
+            className="absolute -right-36 sm:-right-44 lg:-right-36 -top-24 sm:-top-28 w-[360px] sm:w-[520px] lg:w-[600px] h-[360px] sm:h-[520px] lg:h-[600px] opacity-85 labs-shape-float-rotate"
           />
 
-          {/* Subtle Secondary Floating Cloud-Clover on Bottom Left */}
+          {/* 3D Golden Sculptural Blob nested in Far Bottom-Right Margin */}
+          <Labs3DBlobShape
+            variant="mirrored"
+            className="hidden sm:block absolute -right-20 lg:-right-12 -bottom-24 w-[240px] sm:w-[300px] lg:w-[340px] h-[240px] sm:h-[300px] lg:h-[340px] opacity-85 labs-shape-slow-spin"
+          />
+
+          {/* Subtle Secondary Floating Cloud-Clover in Far Bottom-Left Corner */}
           <LabsCloudShape
             variant="pink-yellow"
-            className="hidden sm:block absolute -left-28 -bottom-32 w-[320px] h-[300px] opacity-60 labs-shape-float-breathe"
+            className="hidden sm:block absolute -left-36 -bottom-36 w-[300px] h-[280px] opacity-50 labs-shape-float-breathe"
           />
 
           <div className="max-w-2xl space-y-8 relative z-10">
@@ -755,11 +757,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
       </section>
 
       {/* The Five Dimensions of Love Overview */}
-      <section className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-28">
-        {/* Ambient Floating Flower Accent behind Section Header */}
+      <section className="relative overflow-hidden max-w-6xl mx-auto px-4 sm:px-6 pt-28">
+        {/* Outer-Left Margin Floating Flower (shifted away from central title for crisp readability) */}
         <LabsFlowerShape
           variant="soft-bloom"
-          className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-8 w-[340px] sm:w-[440px] h-[340px] sm:h-[440px] opacity-55 labs-shape-float-breathe"
+          className="hidden md:block pointer-events-none absolute -left-28 lg:-left-20 top-0 w-[260px] lg:w-[310px] h-[260px] lg:h-[310px] opacity-55 labs-shape-float-breathe"
+        />
+
+        {/* Outer-Right Margin 3D Golden Sculptural Blob */}
+        <Labs3DBlobShape
+          variant="tilted"
+          className="hidden md:block pointer-events-none absolute -right-24 lg:-right-16 top-2 w-[240px] lg:w-[290px] h-[240px] lg:h-[290px] opacity-75 labs-shape-float-rotate"
         />
 
         <div className="relative z-10 text-center max-w-2xl mx-auto space-y-5 mb-16">
@@ -906,10 +914,16 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
       {/*Interactive Archive*/}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-24">
         <div className="relative overflow-hidden p-10 sm:p-14 rounded-3xl bg-[#F4F4F9] space-y-10">
-          {/* Floating Cloud-Flower Accent on Right Edge */}
+          {/* Floating Cloud-Flower Accent in Far Top-Right Corner */}
           <LabsCloudShape
             variant="yellow-pink"
-            className="absolute -right-24 -top-20 w-[340px] sm:w-[420px] h-[320px] sm:h-[390px] opacity-75 labs-shape-float-rotate"
+            className="absolute -right-32 -top-24 w-[320px] sm:w-[400px] h-[300px] sm:h-[370px] opacity-65 labs-shape-float-rotate"
+          />
+
+          {/* Companion 3D Golden Blob in Far Bottom-Right Margin */}
+          <Labs3DBlobShape
+            variant="default"
+            className="hidden sm:block absolute -right-20 -bottom-24 w-[240px] sm:w-[280px] h-[240px] sm:h-[280px] opacity-75 labs-shape-float-breathe"
           />
 
           <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">

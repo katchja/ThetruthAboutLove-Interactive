@@ -239,3 +239,10 @@
   animation: labs-float-breathe 28s ease-in-out infinite;
   will-change: transform;
 }
+
+.labs-3d-blob {
+  mix-blend-mode: multiply;
+  -webkit-mask-image: radial-gradient(circle, rgba(0, 0, 0, 1) 55%, rgba(0, 0, 0, 0.7) 68%, rgba(0, 0, 0, 0) 78%);
+  mask-image: radial-gradient(circle, rgba(0, 0, 0, 1) 55%, rgba(0, 0, 0, 0.7) 68%, rgba(0, 0, 0, 0) 78%);
+}
+
