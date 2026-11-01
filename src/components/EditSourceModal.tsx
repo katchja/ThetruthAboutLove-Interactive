@@ -195,7 +195,15 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) return;
+    if (!title.trim()) return;
+
+    const effectiveContent =
+      content.trim() ||
+      summary.trim() ||
+      [author.trim(), year.trim(), title.trim(), reference.trim(), externalUrl.trim()]
+        .filter(Boolean)
+        .join(' — ') ||
+      title.trim();
 
     setIsSaving(true);
     try {
@@ -210,17 +218,24 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
         Boolean(ocrDocumentType.trim()) ||
         Boolean(source.ocrData);
 
+      const resolvedSection: ArchiveSection =
+        type === 'citation' || type === 'book' ? 'references' : section;
+
       const updatedSource: Source = {
         ...source,
         title: title.trim(),
-        section,
+        section: resolvedSection,
         type,
         author: author.trim() || undefined,
         year: year.trim() || undefined,
         reference: reference.trim() || undefined,
         externalUrl: externalUrl.trim() || undefined,
-        summary: summary.trim() || content.trim().substring(0, 180) + '...',
-        content: content.trim(),
+        summary:
+          summary.trim() ||
+          (effectiveContent.length > 180
+            ? effectiveContent.substring(0, 180) + '...'
+            : effectiveContent),
+        content: effectiveContent,
         tags: parsedTags.length > 0 ? parsedTags : ['Catalina Butnaru'],
         isProtected,
         imageUrl: images[0] || undefined,
@@ -230,7 +245,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
               rawTranscription:
                 ocrTranscription.trim() ||
                 source.ocrData?.rawTranscription ||
-                content.trim(),
+                effectiveContent,
               detectedPage: ocrDetectedPage.trim() || undefined,
               documentType: ocrDocumentType.trim() || undefined,
               confidence: source.ocrData?.confidence || 0.95,
@@ -322,7 +337,13 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
               </label>
               <select
                 value={type}
-                onChange={(e) => setType(e.target.value as SourceType)}
+                onChange={(e) => {
+                  const nextType = e.target.value as SourceType;
+                  setType(nextType);
+                  if (nextType === 'citation' || nextType === 'book') {
+                    setSection('references');
+                  }
+                }}
                 className="w-full px-3 py-2.5 rounded-xl border border-[#E0D4CB] bg-[#FAF7F2] text-xs font-medium text-[#241B1C] focus:ring-1 focus:ring-[#FF2A6D] focus:border-[#FF2A6D]"
               >
                 {SOURCE_TYPES.map((t) => (

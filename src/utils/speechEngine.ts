@@ -262,6 +262,9 @@ class SpeechEngine {
       chunks.length > 0
         ? this.fetchChunkAudioDataUrl(chunks[0], settings, activeVoiceId, signal)
         : null;
+    if (nextChunkPromise) {
+      nextChunkPromise.catch(() => {});
+    }
 
     for (let i = 0; i < chunks.length; i++) {
       if (sessionId !== this.playbackSessionId || signal.aborted) return;
@@ -425,7 +428,7 @@ class SpeechEngine {
 
   public resume() {
     if (this.currentAudio && this.currentAudio.paused) {
-      this.currentAudio.play();
+      this.currentAudio.play().catch(() => {});
       this.isPausedState = false;
       return;
     }

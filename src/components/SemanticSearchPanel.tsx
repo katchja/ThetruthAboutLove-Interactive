@@ -64,27 +64,27 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
   ];
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#FAF7F2] text-[#2A2022] overflow-hidden">
+    <div className="flex-1 flex flex-col h-full bg-[#FFFFFF] text-[#0B0B0C] overflow-hidden font-sans">
       {/* Search Header */}
-      <div className="p-4 sm:p-6 border-b border-[#EAE1D9] bg-[#FDFCFA] shadow-sm space-y-4">
+      <div className="p-4 sm:p-6 bg-[#F8F9FA] space-y-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base sm:text-lg font-serif-book font-bold text-[#241B1C] flex items-center gap-2">
-              <Search className="w-4 h-4 text-[#C85A6E]" />
+            <h2 className="text-base sm:text-lg font-display font-bold text-[#0B0B0C] flex items-center gap-2">
+              <Search className="w-4 h-4 text-[#0B0B0C]" />
               Private Local Vector Search
             </h2>
-            <p className="text-xs text-[#8C7A7D] mt-0.5">
+            <p className="text-xs text-[#5F6368] mt-0.5">
               Instant cosine similarity matching across {allChunks.length} local subword vector chunks.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-[#FCECEF] text-[#9E3E50] border border-[#F3CBD2]">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#C85A6E]" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-mono font-medium bg-[#E8EAED] text-[#0B0B0C]">
+              <ShieldCheck className="w-3.5 h-3.5 text-[#0B0B0C]" />
               <span>Zero Cloud Leak</span>
             </div>
             <button
               onClick={onClose}
-              className="p-1 rounded-lg text-[#8C7A7D] hover:text-[#241B1C] hover:bg-[#F5EFEB] text-xs font-semibold px-2 py-1 transition-colors"
+              className="p-1 rounded-lg text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED] text-xs font-semibold px-2 py-1 transition-colors"
             >
               Close ✕
             </button>
@@ -94,19 +94,19 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
         {/* Search input bar */}
         <form onSubmit={handleSearch} className="flex gap-2">
           <div className="relative flex-1">
-            <Search className="w-4 h-4 text-[#A39295] absolute left-3.5 top-3" />
+            <Search className="w-4 h-4 text-[#5F6368] absolute left-3.5 top-3" />
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search concepts, quotes, empirical findings, or citations..."
-              className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-[#E0D4CB] bg-[#FAF7F2] text-sm text-[#2A2022] placeholder-[#A39295] focus:outline-none focus:ring-2 focus:ring-[#C85A6E]/40 focus:border-[#C85A6E]"
+              className="w-full pl-10 pr-4 py-2.5 rounded-xl bg-[#FFFFFF] text-sm text-[#0B0B0C] placeholder-[#80868B] focus:outline-none"
             />
           </div>
           <button
             type="submit"
             disabled={!query.trim() || isSearching}
-            className="px-5 py-2.5 rounded-xl bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-semibold shadow-md shadow-[#FF2A6D]/25 transition-colors disabled:opacity-50 flex items-center gap-1.5"
+            className="px-5 py-2.5 rounded-xl bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-semibold transition-colors disabled:opacity-50 flex items-center gap-1.5"
           >
             <span>Search</span>
             <Zap className="w-3.5 h-3.5" />
@@ -116,8 +116,8 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
         {/* Filters and quick queries */}
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
           <div className="flex items-center gap-1.5">
-            <Filter className="w-3 h-3 text-[#A39295]" />
-            <span className="text-[#8C7A7D] text-[11px]">Type:</span>
+            <Filter className="w-3 h-3 text-[#5F6368]" />
+            <span className="text-[#5F6368] text-[11px] font-mono">Type:</span>
             {['all', 'chapter', 'scan', 'article', 'note'].map((type) => (
               <button
                 key={type}
@@ -127,8 +127,8 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
                 }}
                 className={`px-2 py-0.5 rounded text-[11px] capitalize transition-colors ${
                   filterType === type
-                    ? 'bg-[#FCECEF] text-[#9E3E50] border border-[#F3CBD2] font-semibold'
-                    : 'text-[#7D6B6E] hover:text-[#241B1C]'
+                    ? 'bg-[#FF2A6D] text-white font-semibold'
+                    : 'text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
                 }`}
               >
                 {type}
@@ -137,7 +137,7 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
           </div>
 
           <div className="flex items-center gap-1 overflow-x-auto py-1">
-            <span className="text-[11px] text-[#A39295] shrink-0">Try:</span>
+            <span className="text-[11px] text-[#5F6368] font-mono shrink-0">Try:</span>
             {sampleSearchQueries.slice(0, 3).map((sample, idx) => (
               <button
                 key={idx}
@@ -145,7 +145,7 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
                   setQuery(sample);
                   setTimeout(() => handleSearch(), 50);
                 }}
-                className="px-2 py-0.5 rounded bg-[#F5EFEB] text-[#635154] text-[10px] hover:bg-[#FCECEF] hover:text-[#9E3E50] transition-colors shrink-0"
+                className="px-2 py-0.5 rounded bg-[#E8EAED] text-[#202124] text-[10px] hover:bg-[#FF2A6D] hover:text-white transition-colors shrink-0"
               >
                 {sample}
               </button>
@@ -157,9 +157,9 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
       {/* Results View */}
       <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
         {searchDurationMs !== null && (
-          <div className="flex items-center justify-between text-xs text-[#8C7A7D] px-1">
+          <div className="flex items-center justify-between text-xs text-[#5F6368] px-1">
             <span>
-              Found <strong className="text-[#241B1C]">{results.length}</strong> matching passages
+              Found <strong className="text-[#0B0B0C]">{results.length}</strong> matching passages
             </span>
             <span className="font-mono text-[11px]">
               Cosine distance computed in {searchDurationMs}ms (in-browser)
@@ -168,20 +168,20 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
         )}
 
         {results.length === 0 && query.trim() && !isSearching && (
-          <div className="text-center py-12 text-[#8C7A7D] text-xs">
+          <div className="text-center py-12 text-[#5F6368] text-xs">
             No vector matches found for "{query}". Try broader conceptual keywords.
           </div>
         )}
 
         {results.length === 0 && !query.trim() && (
           <div className="max-w-md mx-auto text-center py-12 space-y-3">
-            <div className="w-12 h-12 rounded-xl bg-[#FCECEF] flex items-center justify-center text-[#C85A6E] mx-auto">
+            <div className="w-12 h-12 rounded-xl bg-[#F1F3F4] flex items-center justify-center text-[#0B0B0C] mx-auto">
               <Search className="w-6 h-6" />
             </div>
-            <h3 className="font-serif-book font-semibold text-[#241B1C] text-sm">
+            <h3 className="font-display font-semibold text-[#0B0B0C] text-sm">
               Semantic Conceptual Retrieval
             </h3>
-            <p className="text-xs text-[#635154] leading-relaxed">
+            <p className="text-xs text-[#5F6368] leading-relaxed">
               Every source, chapter, OCR scan, and author note is indexed into private 256-dimensional vectors. Search by theme rather than just exact keywords.
             </p>
           </div>
@@ -192,50 +192,50 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
           return (
             <div
               key={res.chunk.id}
-              className="p-4 rounded-xl border border-[#EAE1D9] bg-[#FDFCFA] shadow-sm hover:border-[#C85A6E]/50 transition-all space-y-3"
+              className="p-4 rounded-xl bg-[#F8F9FA] transition-all space-y-3"
             >
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 min-w-0">
-                  <span className="px-2 py-0.5 rounded text-[10px] font-semibold bg-[#FCECEF] text-[#9E3E50] uppercase">
+                  <span className="px-2 py-0.5 rounded text-[10px] font-mono font-semibold bg-[#E8EAED] text-[#0B0B0C] uppercase">
                     {res.chunk.sourceType}
                   </span>
                   <h4 
                     onClick={() => onSelectSource(res.chunk.sourceId)}
-                    className="text-xs font-semibold text-[#241B1C] truncate cursor-pointer hover:text-[#C85A6E] transition-colors"
+                    className="text-xs font-display font-semibold text-[#0B0B0C] truncate cursor-pointer hover:text-[#5F6368] transition-colors"
                   >
                     {res.chunk.sourceTitle}
                   </h4>
                   {res.chunk.reference && (
-                    <span className="text-[11px] text-[#8C7A7D] font-mono hidden sm:inline">
+                    <span className="text-[11px] text-[#5F6368] font-mono hidden sm:inline">
                       • {res.chunk.reference}
                     </span>
                   )}
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <div className="w-16 bg-[#EAE1D9] rounded-full h-2 overflow-hidden">
+                  <div className="w-16 bg-[#E8EAED] rounded-full h-2 overflow-hidden">
                     <div
-                      className="bg-[#C85A6E] h-full rounded-full"
+                      className="bg-[#0B0B0C] h-full rounded-full"
                       style={{ width: `${Math.min(100, matchPercent)}%` }}
                     />
                   </div>
-                  <span className="font-mono text-xs font-semibold text-[#C85A6E]">
+                  <span className="font-mono text-xs font-semibold text-[#0B0B0C]">
                     {matchPercent}%
                   </span>
                 </div>
               </div>
 
               {/* Passage text */}
-              <p className="text-xs text-[#4D3D40] font-serif-book leading-relaxed pl-2 border-l-2 border-[#C85A6E]/60">
+              <p className="text-xs text-[#202124] font-sans leading-relaxed pl-2">
                 "{res.chunk.text}"
               </p>
 
               {/* Matched terms tags and ask action */}
-              <div className="flex items-center justify-between pt-2 border-t border-[#F0E6DE] text-[11px]">
+              <div className="flex items-center justify-between pt-2 text-[11px]">
                 <div className="flex items-center gap-1">
-                  <span className="text-[#8C7A7D]">Matched:</span>
+                  <span className="text-[#5F6368] font-mono">Matched:</span>
                   {res.matchedTerms.map((t) => (
-                    <span key={t} className="px-1.5 py-0.5 rounded bg-[#F5EFEB] text-[#635154] font-mono text-[10px]">
+                    <span key={t} className="px-1.5 py-0.5 rounded bg-[#E8EAED] text-[#5F6368] font-mono text-[10px]">
                       {t}
                     </span>
                   ))}
@@ -243,7 +243,7 @@ export const SemanticSearchPanel: React.FC<SemanticSearchPanelProps> = ({
 
                 <button
                   onClick={() => onAskAboutExcerpt(res.chunk.text, res.chunk.sourceTitle)}
-                  className="inline-flex items-center gap-1 text-[#C85A6E] hover:text-[#B34B5E] font-medium"
+                  className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white font-medium transition-colors"
                 >
                   <span>Ask Manuscript about this</span>
                   <ArrowRight className="w-3 h-3" />

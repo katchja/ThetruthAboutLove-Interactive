@@ -1,4 +1,4 @@
-import { Source, VectorChunk, SearchResult } from '../types';
+import { Source, VectorChunk, SearchResult, getSourceImages, getSourceSection } from '../types';
 
 const DB_NAME = 'TruthAboutLove_LocalArchive_v5';
 const DB_VERSION = 1;
@@ -183,30 +183,60 @@ export async function indexSource(source: Source): Promise<VectorChunk[]> {
 
   try {
     const db = await openDB();
-    const tx = db.transaction([SOURCES_STORE, CHUNKS_STORE], 'readwrite');
-    const sourceStore = tx.objectStore(SOURCES_STORE);
-    const chunkStore = tx.objectStore(CHUNKS_STORE);
+    return await new Promise<VectorChunk[]>((resolve) => {
+      try {
+        const tx = db.transaction([SOURCES_STORE, CHUNKS_STORE], 'readwrite');
+        const sourceStore = tx.objectStore(SOURCES_STORE);
+        const chunkStore = tx.objectStore(CHUNKS_STORE);
 
-    sourceStore.put(source);
+        sourceStore.put(source);
 
-    // Remove any existing chunks for this sourceId before inserting updated chunks
-    const index = chunkStore.index('sourceId');
-    const req = index.openCursor(IDBKeyRange.only(source.id));
-    req.onsuccess = (e: any) => {
-      const cursor = e.target.result;
-      if (cursor) {
-        chunkStore.delete(cursor.primaryKey);
-        cursor.continue();
-      } else {
-        for (const chunk of chunks) {
-          chunkStore.put(chunk);
-        }
+        // Remove any existing chunks for this sourceId before inserting updated chunks
+        const index = chunkStore.index('sourceId');
+        const req = index.openCursor(IDBKeyRange.only(source.id));
+        req.onsuccess = (e: any) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            chunkStore.delete(cursor.primaryKey);
+            cursor.continue();
+          } else {
+            for (const chunk of chunks) {
+              chunkStore.put(chunk);
+            }
+          }
+        };
+        req.onerror = () => {
+          for (const chunk of chunks) {
+            try {
+              chunkStore.put(chunk);
+            } catch {}
+          }
+        };
+
+        tx.oncomplete = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve(chunks);
+        };
+        tx.onerror = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve(chunks);
+        };
+        tx.onabort = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve(chunks);
+        };
+      } catch {
+        try {
+          db.close();
+        } catch {}
+        resolve(chunks);
       }
-    };
-
-    return new Promise((resolve, reject) => {
-      tx.oncomplete = () => resolve(chunks);
-      tx.onerror = () => reject(tx.error);
     });
   } catch (err) {
     console.warn('IndexedDB save failed, keeping in memory:', err);
@@ -402,27 +432,75 @@ export async function loadArchiveFromDB(): Promise<{ sources: Source[]; chunks: 
   try {
     const db = await openDB();
     const raw = await new Promise<{ sources: Source[]; chunks: VectorChunk[] }>((resolve) => {
-      const tx = db.transaction([SOURCES_STORE, CHUNKS_STORE], 'readonly');
-      const sourceStore = tx.objectStore(SOURCES_STORE);
-      const chunkStore = tx.objectStore(CHUNKS_STORE);
+      try {
+        const tx = db.transaction([SOURCES_STORE, CHUNKS_STORE], 'readonly');
+        const sourceStore = tx.objectStore(SOURCES_STORE);
+        const chunkStore = tx.objectStore(CHUNKS_STORE);
 
-      const sourcesReq = sourceStore.getAll();
-      const chunksReq = chunkStore.getAll();
+        const sourcesReq = sourceStore.getAll();
+        const chunksReq = chunkStore.getAll();
 
-      tx.oncomplete = () => {
-        resolve({
-          sources: sourcesReq.result || [],
-          chunks: chunksReq.result || [],
-        });
-      };
-      tx.onerror = () => {
+        tx.oncomplete = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve({
+            sources: sourcesReq.result || [],
+            chunks: chunksReq.result || [],
+          });
+        };
+        tx.onerror = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve({ sources: [], chunks: [] });
+        };
+        tx.onabort = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve({ sources: [], chunks: [] });
+        };
+      } catch {
+        try {
+          db.close();
+        } catch {}
         resolve({ sources: [], chunks: [] });
-      };
+      }
     });
 
     const deletedSet = getDeletedSourceIds();
     const purgedIds = new Set<string>(deletedSet);
     const byId = new Map<string, Source>();
+
+    const mergeStoredSources = (older: Source, newer: Source): Source => {
+      const olderImgs = getSourceImages(older);
+      const newerImgs = getSourceImages(newer);
+      const combinedImgs: string[] = [];
+      for (const img of [...newerImgs, ...olderImgs]) {
+        if (img && !combinedImgs.includes(img)) {
+          combinedImgs.push(img);
+        }
+      }
+
+      const olderModified = older.updatedAt || (older.createdAt > 1710000000000 ? older.createdAt : 0);
+      const newerModified = newer.updatedAt || (newer.createdAt > 1710000000000 ? newer.createdAt : 0);
+      const preferOlder =
+        olderModified > newerModified ||
+        (olderImgs.some((i) => i.startsWith('data:image/')) &&
+          !newerImgs.some((i) => i.startsWith('data:image/')) &&
+          !newer.updatedAt);
+
+      const base = preferOlder ? { ...newer, ...older } : { ...older, ...newer };
+      const finalImages = newer.updatedAt ? newerImgs : combinedImgs;
+
+      return {
+        ...base,
+        section: getSourceSection(base),
+        imageUrl: finalImages[0] || base.imageUrl,
+        images: finalImages.length > 0 ? finalImages : undefined,
+      };
+    };
 
     // 1. First load any legacy DB sources so v5 overrides or enriches them
     const legacySources = await recoverLegacyIndexedDBSources();
@@ -431,18 +509,15 @@ export async function loadArchiveFromDB(): Promise<{ sources: Source[]; chunks: 
         continue;
       }
       if (!byId.has(leg.id)) {
-        byId.set(leg.id, leg);
-      } else {
-        const cur = byId.get(leg.id)!;
-        const legImages = Array.isArray(leg.images) ? leg.images.filter(Boolean) : [];
-        const curImages = Array.isArray(cur.images) ? cur.images.filter(Boolean) : [];
-        const mergedImages = curImages.length > 0 ? curImages : legImages;
+        const imgs = getSourceImages(leg);
         byId.set(leg.id, {
           ...leg,
-          ...cur,
-          imageUrl: cur.imageUrl || leg.imageUrl || mergedImages[0],
-          images: mergedImages.length > 0 ? mergedImages : undefined,
+          section: getSourceSection(leg),
+          imageUrl: imgs[0] || leg.imageUrl,
+          images: imgs.length > 0 ? imgs : undefined,
         });
+      } else {
+        byId.set(leg.id, mergeStoredSources(byId.get(leg.id)!, leg));
       }
     }
 
@@ -454,17 +529,15 @@ export async function loadArchiveFromDB(): Promise<{ sources: Source[]; chunks: 
       } else {
         const prev = byId.get(source.id);
         if (!prev) {
-          byId.set(source.id, source);
-        } else {
-          const srcImages = Array.isArray(source.images) ? source.images.filter(Boolean) : [];
-          const prevImages = Array.isArray(prev.images) ? prev.images.filter(Boolean) : [];
-          const mergedImages = srcImages.length > 0 ? srcImages : prevImages;
+          const imgs = getSourceImages(source);
           byId.set(source.id, {
-            ...prev,
             ...source,
-            imageUrl: source.imageUrl || prev.imageUrl || mergedImages[0],
-            images: mergedImages.length > 0 ? mergedImages : undefined,
+            section: getSourceSection(source),
+            imageUrl: imgs[0] || source.imageUrl,
+            images: imgs.length > 0 ? imgs : undefined,
           });
+        } else {
+          byId.set(source.id, mergeStoredSources(prev, source));
         }
       }
     }
@@ -505,27 +578,50 @@ export async function removeSourceFromDB(sourceId: string, recordDeleted = true)
   }
   try {
     const db = await openDB();
-    await new Promise<void>((resolve, reject) => {
-      const tx = db.transaction([SOURCES_STORE, CHUNKS_STORE], 'readwrite');
-      tx.objectStore(SOURCES_STORE).delete(sourceId);
+    await new Promise<void>((resolve) => {
+      try {
+        const tx = db.transaction([SOURCES_STORE, CHUNKS_STORE], 'readwrite');
+        tx.objectStore(SOURCES_STORE).delete(sourceId);
 
-      const chunkStore = tx.objectStore(CHUNKS_STORE);
-      const index = chunkStore.index('sourceId');
-      const req = index.openCursor(IDBKeyRange.only(sourceId));
+        const chunkStore = tx.objectStore(CHUNKS_STORE);
+        const index = chunkStore.index('sourceId');
+        const req = index.openCursor(IDBKeyRange.only(sourceId));
 
-      req.onsuccess = (e: any) => {
-        const cursor = e.target.result;
-        if (cursor) {
-          chunkStore.delete(cursor.primaryKey);
-          cursor.continue();
-        }
-      };
+        req.onsuccess = (e: any) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            chunkStore.delete(cursor.primaryKey);
+            cursor.continue();
+          }
+        };
 
-      tx.oncomplete = () => resolve();
-      tx.onerror = () => reject(tx.error);
+        tx.oncomplete = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve();
+        };
+        tx.onerror = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve();
+        };
+        tx.onabort = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve();
+        };
+      } catch {
+        try {
+          db.close();
+        } catch {}
+        resolve();
+      }
     });
   } catch (err) {
-    console.error('Failed to remove source from IndexedDB', err);
+    console.warn('Failed to remove source from IndexedDB', err);
   }
 }
 

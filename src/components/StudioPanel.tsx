@@ -188,8 +188,7 @@ export const StudioPanel: React.FC<StudioPanelProps> = ({
               </button>
               <button
                 onClick={() => {
-                  navigator.clipboard.writeText(activeArtifact.content);
-                  alert('Copied to clipboard');
+                  navigator.clipboard.writeText(activeArtifact.content).catch(() => {});
                 }}
                 className="text-[11px] text-stone-500 hover:text-stone-800"
               >

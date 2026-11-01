@@ -46,8 +46,9 @@ export function getSourceImages(source: Source): string[] {
 }
 
 export function getSourceSection(source: Source): ArchiveSection {
-  if (source.section) return source.section;
+  if (source.section === 'references') return 'references';
   if (source.type === 'citation' || source.type === 'book') return 'references';
+  if (source.section === 'authored') return 'authored';
   if (
     source.type === 'chapter' ||
     source.type === 'article' ||

@@ -59,7 +59,7 @@ export const Header: React.FC<HeaderProps> = ({
       : 'voice_lp7vh3bk6taq';
 
   return (
-    <header className="sticky top-0 z-30 bg-[#241B1C]/95 backdrop-blur-md border-b border-[#3B2B2E] text-[#F5EFEB]">
+    <header className="sticky top-0 z-30 bg-[#FFFFFF]/95 backdrop-blur-md text-[#0B0B0C]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
         {/* Brand / Book info (clickable to homepage) */}
         <div
@@ -70,42 +70,57 @@ export const Header: React.FC<HeaderProps> = ({
           className="flex items-center gap-3 min-w-0 cursor-pointer group shrink-0"
           title="Return to Homepage: The Truth About Love"
         >
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#FF2A6D] to-[#D91450] flex items-center justify-center shadow-md shadow-[#FF2A6D]/30 shrink-0 group-hover:scale-105 transition-transform ring-1 ring-[#FF2A6D]/40">
+          <div className="w-10 h-10 rounded-xl bg-[#0B0B0C] flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform">
             <Heart className="w-5 h-5 text-white fill-white" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-2">
-              <span className="font-semibold text-[#FAF7F2] text-base tracking-tight truncate group-hover:text-[#FFA8C2] transition-colors font-serif-book whitespace-nowrap">
+              <span className="font-medium text-[#0B0B0C] text-lg tracking-tight truncate group-hover:text-[#5F6368] transition-colors font-display whitespace-nowrap">
                 The Truth About Love
               </span>
             </div>
-            <p className="text-xs text-[#B5A4A7] truncate max-w-xs">
+            <p className="text-xs text-[#5F6368] truncate max-w-xs font-sans">
               Catalina Butnaru · Interactive Manuscript
             </p>
           </div>
         </div>
 
         {/* View mode switcher & Studio triggers */}
-        <div className="hidden md:flex items-center p-1 bg-[#191112]/80 rounded-xl border border-[#3B2B2E] text-xs gap-1">
+        <div className="hidden md:flex items-center p-1 bg-[#F1F3F4] rounded-xl text-xs gap-1">
           <button
-            onClick={() => setCurrentView('archive')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap ${
-              currentView === 'archive'
-                ? 'bg-[#FF2A6D] text-white shadow-md shadow-[#FF2A6D]/30 font-semibold'
-                : 'text-[#C2B2B5] hover:text-[#FFFFFF] hover:bg-[#382629]'
+            onClick={() => {
+              setCurrentView('landing');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap cursor-pointer ${
+              currentView === 'landing'
+                ? 'bg-[#FFFFFF] text-[#0B0B0C] font-semibold'
+                : 'text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
           >
-            <Archive className="w-3.5 h-3.5" />
+            <Heart className="w-3.5 h-3.5 text-current" />
+            <span>The Manuscript</span>
+          </button>
+
+          <button
+            onClick={() => setCurrentView('archive')}
+            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap cursor-pointer ${
+              currentView === 'archive'
+                ? 'bg-[#FFFFFF] text-[#0B0B0C] font-semibold'
+                : 'text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
+            }`}
+          >
+            <Archive className="w-3.5 h-3.5 text-current" />
             <span>Manuscript Archive &amp; Citations</span>
           </button>
 
           {onOpenChatPopup && (
             <button
               onClick={onOpenChatPopup}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-semibold text-[#FFA8C2] hover:text-white hover:bg-[#FF2A6D]/20 transition-all whitespace-nowrap"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-semibold text-white bg-[#FF2A6D] hover:bg-[#E61556] transition-all whitespace-nowrap cursor-pointer"
               title="Open Multi-Turn Conversational Manuscript"
             >
-              <MessageSquare className="w-3.5 h-3.5 text-[#FF2A6D]" />
+              <MessageSquare className="w-3.5 h-3.5 text-white" />
               <span>Ask Manuscript</span>
             </button>
           )}
@@ -118,12 +133,12 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onPublishToPublic}
               disabled={syncStatus === 'syncing'}
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold border transition-all whitespace-nowrap ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
                 syncStatus === 'synced'
-                  ? 'bg-emerald-950/70 border-emerald-600/60 text-emerald-200 hover:bg-emerald-900/80'
+                  ? 'bg-[#F1F3F4] text-[#0B0B0C] hover:bg-[#E8EAED]'
                   : syncStatus === 'error'
-                  ? 'bg-rose-950/80 border-rose-500 text-rose-200 hover:bg-rose-900'
-                  : 'bg-[#FF2A6D] border-[#FF2A6D] text-white hover:bg-[#E61556] shadow-sm shadow-[#FF2A6D]/30'
+                  ? 'bg-[#202124] text-white hover:bg-[#0B0B0C]'
+                  : 'bg-[#FF2A6D] text-white hover:bg-[#E61556]'
               }`}
               title={
                 syncedStats
@@ -138,8 +153,8 @@ export const Header: React.FC<HeaderProps> = ({
                 </>
               ) : syncStatus === 'synced' ? (
                 <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="hidden xl:inline">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-[#0B0B0C]" />
+                  <span className="hidden xl:inline font-mono">
                     Published ({syncedStats?.photoCount ?? 0} Photos · {syncedStats?.citationCount ?? 0} Citations)
                   </span>
                   <span className="xl:hidden">Published</span>
@@ -156,24 +171,24 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Semantic Search toggle */}
           <button
             onClick={onToggleSemanticSearch}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
               isSemanticSearchOpen
-                ? 'bg-[#FF2A6D] border-[#FF2A6D] text-white shadow-sm shadow-[#FF2A6D]/30'
-                : 'bg-[#2E2023] border-[#443034] text-[#DBCBCD] hover:border-[#FF2A6D]/50 hover:text-[#FFA8C2]'
+                ? 'bg-[#FF2A6D] text-white'
+                : 'bg-[#F1F3F4] text-[#202124] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
             title="Search private vector embeddings directly"
           >
-            <Search className="w-3.5 h-3.5" />
+            <Search className="w-3.5 h-3.5 text-current" />
             <span className="hidden lg:inline">Vector Search</span>
           </button>
 
           {/* Privacy & Offline toggle */}
           <button
             onClick={() => setIsOfflineMode(!isOfflineMode)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-all whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
               isOfflineMode
-                ? 'bg-[#3D1A25] border-[#FF2A6D] text-[#FFA8C2] shadow-sm'
-                : 'bg-[#2E2023] border-[#443034] text-[#C2B2B5] hover:border-[#FF2A6D]/50 hover:text-[#FFFFFF]'
+                ? 'bg-[#FF2A6D] text-white font-semibold'
+                : 'bg-[#F1F3F4] text-[#202124] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
             title={
               isOfflineMode
@@ -183,12 +198,12 @@ export const Header: React.FC<HeaderProps> = ({
           >
             {isOfflineMode ? (
               <>
-                <ShieldCheck className="w-3.5 h-3.5 text-[#FF2A6D]" />
+                <ShieldCheck className="w-3.5 h-3.5 text-white" />
                 <span className="hidden sm:inline">Offline Privacy</span>
               </>
             ) : (
               <>
-                <Database className="w-3.5 h-3.5 text-[#B5A4A7]" />
+                <Database className="w-3.5 h-3.5 text-[#5F6368]" />
                 <span className="hidden sm:inline">Local Index + AI</span>
               </>
             )}
@@ -199,10 +214,10 @@ export const Header: React.FC<HeaderProps> = ({
             <button
               onClick={onOpenVoiceSettings}
               data-voice-id={embeddedVoiceId}
-              className="px-2.5 py-1.5 rounded-lg bg-[#2E2023] border border-[#443034] text-[#FFA8C2] hover:border-[#FF2A6D] hover:text-white transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap"
+              className="px-3 py-1.5 rounded-lg bg-[#F1F3F4] text-[#202124] hover:text-[#0B0B0C] hover:bg-[#E8EAED] transition-colors flex items-center gap-1.5 text-xs font-medium whitespace-nowrap cursor-pointer"
               title="Open Author Voice Studio"
             >
-              <Volume2 className="w-3.5 h-3.5 text-[#FF2A6D]" />
+              <Volume2 className="w-3.5 h-3.5 text-current" />
               <span className="hidden xl:inline">Author Voice</span>
             </button>
           )}
@@ -211,7 +226,7 @@ export const Header: React.FC<HeaderProps> = ({
           {onOpenBookSettings && (
             <button
               onClick={onOpenBookSettings}
-              className="p-2 rounded-lg bg-[#2E2023] border border-[#443034] text-[#DBCBCD] hover:border-[#FF2A6D]/50 hover:text-[#FFA8C2] transition-colors"
+              className="p-2 rounded-lg bg-[#F1F3F4] text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED] transition-colors cursor-pointer"
               title="Book Metadata & Settings"
             >
               <Settings className="w-4 h-4" />

@@ -57,10 +57,11 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
     if (isOpen) {
       setSelectedSection(defaultSection);
       if (defaultSection === 'references') {
-        setActiveTab('link');
+        setActiveTab('doc');
+        setAuthor((prev) => (prev === 'Catalina Butnaru' ? '' : prev));
       } else {
         setActiveTab('doc');
-        if (!author) setAuthor('Catalina Butnaru');
+        setAuthor((prev) => prev || 'Catalina Butnaru');
       }
     }
   }, [isOpen, defaultSection]);
@@ -177,7 +178,15 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim() || !content.trim()) return;
+    if (!title.trim()) return;
+
+    const effectiveContent =
+      content.trim() ||
+      summary.trim() ||
+      [author.trim(), year.trim(), title.trim(), reference.trim(), externalUrl.trim()]
+        .filter(Boolean)
+        .join(' — ') ||
+      title.trim();
 
     setIsSubmitting(true);
     try {
@@ -216,14 +225,20 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
         author: author.trim() || (selectedSection === 'authored' ? 'Catalina Butnaru' : undefined),
         year: year.trim() || undefined,
         reference: reference.trim() || undefined,
-        summary: summary.trim() || content.trim().substring(0, 160) + '...',
-        content: content.trim(),
+        summary:
+          summary.trim() ||
+          (effectiveContent.length > 160
+            ? effectiveContent.substring(0, 160) + '...'
+            : effectiveContent),
+        content: effectiveContent,
         tags,
         externalUrl: externalUrl.trim() || undefined,
         imageUrl: imagePreview || undefined,
+        images: imagePreview ? [imagePreview] : undefined,
         ocrData: ocrData || undefined,
         isProtected: isProtected,
         createdAt: Date.now(),
+        updatedAt: Date.now(),
       };
 
       await onAddSource(newSource);
@@ -600,7 +615,7 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={isSubmitting || !title.trim() || !content.trim()}
+            disabled={isSubmitting || !title.trim()}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#FF2A6D] hover:bg-[#E61556] disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-[#FF2A6D]/25 transition-colors"
           >
             {isSubmitting ? (

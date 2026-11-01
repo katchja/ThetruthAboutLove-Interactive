@@ -199,9 +199,106 @@ export default function App() {
   };
 
   /**
+   * Compresses oversized base64 raster images (>220KB) via HTML5 Canvas so uploaded photos
+   * never exceed Cloud Run proxy body limits and load rapidly on the public app.
+   */
+  const optimizeImageDataUrl = (
+    dataUrl: string,
+    maxDim = 1400,
+    quality = 0.84
+  ): Promise<string> => {
+    return new Promise((resolve) => {
+      if (
+        !dataUrl ||
+        typeof dataUrl !== 'string' ||
+        !dataUrl.startsWith('data:image/') ||
+        dataUrl.startsWith('data:image/svg') ||
+        dataUrl.length <= 280000
+      ) {
+        resolve(dataUrl);
+        return;
+      }
+
+      if (typeof document === 'undefined' || typeof Image === 'undefined') {
+        resolve(dataUrl);
+        return;
+      }
+
+      const img = new Image();
+      const timeoutId = setTimeout(() => resolve(dataUrl), 4000);
+
+      img.onload = () => {
+        clearTimeout(timeoutId);
+        try {
+          let { width, height } = img;
+          if (!width || !height) {
+            resolve(dataUrl);
+            return;
+          }
+          if (width > maxDim || height > maxDim) {
+            if (width >= height) {
+              height = Math.round((height * maxDim) / width);
+              width = maxDim;
+            } else {
+              width = Math.round((width * maxDim) / height);
+              height = maxDim;
+            }
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(dataUrl);
+            return;
+          }
+          // Fill warm paper background for transparent PNGs before JPEG encoding
+          ctx.fillStyle = '#FAF7F2';
+          ctx.fillRect(0, 0, width, height);
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', quality);
+          resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
+        } catch {
+          resolve(dataUrl);
+        }
+      };
+
+      img.onerror = () => {
+        clearTimeout(timeoutId);
+        resolve(dataUrl);
+      };
+
+      img.src = dataUrl;
+    });
+  };
+
+  const optimizeSourceForSync = async (source: Source): Promise<Source> => {
+    const rawImages = getSourceImages(source);
+    const resolvedSection = getSourceSection(source);
+    if (rawImages.length === 0) {
+      return {
+        ...source,
+        section: resolvedSection,
+      };
+    }
+    const optimizedImages: string[] = [];
+    for (const img of rawImages) {
+      const opt = await optimizeImageDataUrl(img);
+      if (opt && !optimizedImages.includes(opt)) {
+        optimizedImages.push(opt);
+      }
+    }
+    return {
+      ...source,
+      section: resolvedSection,
+      imageUrl: optimizedImages[0] || undefined,
+      images: optimizedImages.length > 0 ? optimizedImages : undefined,
+    };
+  };
+
+  /**
    * Publishes all Studio sources, bibliographic citations, and card photos to the backend
    * so they are immediately visible on the public shared link (ais-pre-*).
-   * Splits large base64 photos into per-card requests to avoid Cloud Run proxy body size limits.
    */
   const publishArchiveToPublic = async (
     customSources?: Source[],
@@ -209,53 +306,98 @@ export default function App() {
     customMetadata?: BookMetadata
   ) => {
     if (!isStudioBuildMode) return;
-    const targetSources = customSources || sources;
+    const rawSources = customSources || sources;
     const targetDeleted = customDeletedIds || Array.from(getDeletedSourceIds());
     const targetMetadata = customMetadata || bookMetadata;
 
     setSyncStatus('syncing');
     try {
-      // Step 1: Sync all text, metadata, and Bibliographic & Citation Index entries first
-      // (omitting large data:image base64 strings in the bulk call so it never hits proxy limits)
-      const lightweightSources = targetSources.map((s) => {
-        const hasLargeDataUrl =
-          (s.imageUrl && s.imageUrl.startsWith('data:') && s.imageUrl.length > 60000) ||
-          (Array.isArray(s.images) &&
-            s.images.some((img) => img && img.startsWith('data:') && img.length > 60000));
-        if (!hasLargeDataUrl) return s;
-        return {
-          ...s,
-          imageUrl:
-            s.imageUrl && !s.imageUrl.startsWith('data:') ? s.imageUrl : undefined,
-          images: undefined,
-        };
-      });
-
-      const syncRes = await fetch('/api/archive/sync', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({
-          sources: lightweightSources,
-          deletedIds: targetDeleted,
-          bookMetadata: targetMetadata,
-        }),
-      });
-
-      if (!syncRes.ok) {
-        throw new Error(`Sync failed with status ${syncRes.status}`);
+      // Optimize any oversized base64 photos so requests never fail proxy size limits
+      const targetSources: Source[] = [];
+      for (const s of rawSources) {
+        const opt = await optimizeSourceForSync(s);
+        targetSources.push(opt);
       }
 
-      // Step 2: Sync each source that has attached photos individually so every high-res photo persists
-      const sourcesWithPhotos = targetSources.filter(
-        (s) => getSourceImages(s).length > 0
-      );
-      for (const photoSource of sourcesWithPhotos) {
-        await fetch('/api/archive/source', {
+      // Check total serialized payload size
+      const fullPayload = JSON.stringify({
+        sources: targetSources,
+        deletedIds: targetDeleted,
+        bookMetadata: targetMetadata,
+      });
+
+      if (fullPayload.length < 3500000) {
+        // Fast single-request atomic sync (includes all citations, chapters, and optimized photos)
+        const syncRes = await fetch('/api/archive/sync', {
           method: 'POST',
           headers: getAdminHeaders(),
-          body: JSON.stringify({ source: photoSource }),
+          body: fullPayload,
         });
+        if (!syncRes.ok) {
+          throw new Error(`Sync failed with status ${syncRes.status}`);
+        }
+      } else {
+        // Fallback for very large multi-photo archives:
+        // Step 1: Sync all text, metadata, and Bibliographic & Citation Index entries first
+        const lightweightSources = targetSources.map((s) => {
+          const hasLargeDataUrl =
+            (s.imageUrl && s.imageUrl.startsWith('data:') && s.imageUrl.length > 60000) ||
+            (Array.isArray(s.images) &&
+              s.images.some((img) => img && img.startsWith('data:') && img.length > 60000));
+          if (!hasLargeDataUrl) return s;
+          return {
+            ...s,
+            imageUrl:
+              s.imageUrl && !s.imageUrl.startsWith('data:') ? s.imageUrl : undefined,
+            images: undefined,
+          };
+        });
+
+        const syncRes = await fetch('/api/archive/sync', {
+          method: 'POST',
+          headers: getAdminHeaders(),
+          body: JSON.stringify({
+            sources: lightweightSources,
+            deletedIds: targetDeleted,
+            bookMetadata: targetMetadata,
+          }),
+        });
+
+        if (!syncRes.ok) {
+          throw new Error(`Sync failed with status ${syncRes.status}`);
+        }
+
+        // Step 2: Upload each source with attached photos individually when payload exceeded single-request limit
+        const sourcesWithPhotos = targetSources.filter(
+          (s) => getSourceImages(s).length > 0
+        );
+        for (const photoSource of sourcesWithPhotos) {
+          const photoRes = await fetch('/api/archive/source', {
+            method: 'POST',
+            headers: getAdminHeaders(),
+            body: JSON.stringify({ source: photoSource }),
+          });
+          if (!photoRes.ok) {
+            throw new Error(`Photo source sync failed with status ${photoRes.status}`);
+          }
+        }
       }
+
+      // Verify canonical server state
+      try {
+        const verifyRes = await fetch(`/api/archive?t=${Date.now()}`, {
+          cache: 'no-store',
+          headers: { Accept: 'application/json' },
+        });
+        if (verifyRes.ok) {
+          const verified = await verifyRes.json();
+          if (verified?.stats) {
+            setSyncedStats(verified.stats);
+            setSyncStatus('synced');
+            return;
+          }
+        }
+      } catch {}
 
       setSyncedStats(computeLocalStats(targetSources));
       setSyncStatus('synced');
@@ -336,22 +478,37 @@ export default function App() {
 
         for (const seed of seedSources) {
           if (!combinedDeleted.has(seed.id) && !isPurgedArchiveSource(seed)) {
-            byId.set(seed.id, seed);
+            const seedImgs = getSourceImages(seed);
+            byId.set(seed.id, {
+              ...seed,
+              section: getSourceSection(seed),
+              imageUrl: seedImgs[0] || seed.imageUrl,
+              images: seedImgs.length > 0 ? seedImgs : undefined,
+            });
           }
         }
 
         for (const srv of serverSources) {
           if (srv && srv.id && !combinedDeleted.has(srv.id) && !isPurgedArchiveSource(srv)) {
             const existing = byId.get(srv.id);
+            const srvImages = getSourceImages(srv);
             if (!existing) {
-              byId.set(srv.id, srv);
+              byId.set(srv.id, {
+                ...srv,
+                section: getSourceSection(srv),
+                imageUrl: srvImages[0] || srv.imageUrl,
+                images: srvImages.length > 0 ? srvImages : undefined,
+              });
             } else {
-              const srvImages = getSourceImages(srv);
               const exImages = getSourceImages(existing);
               const mergedImages = srvImages.length > 0 ? srvImages : exImages;
-              byId.set(srv.id, {
+              const merged = {
                 ...existing,
                 ...srv,
+              };
+              byId.set(srv.id, {
+                ...merged,
+                section: getSourceSection(merged),
                 imageUrl: mergedImages[0] || srv.imageUrl || existing.imageUrl,
                 images: mergedImages.length > 0 ? mergedImages : undefined,
               });
@@ -367,35 +524,56 @@ export default function App() {
               continue;
             }
             const current = byId.get(loc.id);
+            const locImages = getSourceImages(loc);
             if (!current) {
-              byId.set(loc.id, loc);
+              byId.set(loc.id, {
+                ...loc,
+                section: getSourceSection(loc),
+                imageUrl: locImages[0] || loc.imageUrl,
+                images: locImages.length > 0 ? locImages : undefined,
+              });
             } else {
-              const locImages = getSourceImages(loc);
               const curImages = getSourceImages(current);
-              const mergedImages = locImages.length > 0 ? locImages : curImages;
-              const locTime = loc.updatedAt || loc.createdAt || 0;
-              const curTime = current.updatedAt || current.createdAt || 0;
+              const combinedImages: string[] = [];
+              for (const img of [...locImages, ...curImages]) {
+                if (img && !combinedImages.includes(img)) {
+                  combinedImages.push(img);
+                }
+              }
+              const locTime = loc.updatedAt || (loc.createdAt > 1710000000000 ? loc.createdAt : 0);
+              const curTime = current.updatedAt || (current.createdAt > 1710000000000 ? current.createdAt : 0);
 
               if (locTime >= curTime || locImages.length >= curImages.length) {
+                const merged = { ...current, ...loc };
+                const imgsToUse = loc.updatedAt ? locImages : combinedImages;
                 byId.set(loc.id, {
-                  ...current,
-                  ...loc,
-                  imageUrl: mergedImages[0] || loc.imageUrl || current.imageUrl,
-                  images: mergedImages.length > 0 ? mergedImages : undefined,
+                  ...merged,
+                  section: getSourceSection(merged),
+                  imageUrl: imgsToUse[0] || loc.imageUrl || current.imageUrl,
+                  images: imgsToUse.length > 0 ? imgsToUse : undefined,
                 });
               } else {
+                const merged = { ...loc, ...current };
                 byId.set(loc.id, {
-                  ...loc,
-                  ...current,
-                  imageUrl: mergedImages[0] || current.imageUrl || loc.imageUrl,
-                  images: mergedImages.length > 0 ? mergedImages : undefined,
+                  ...merged,
+                  section: getSourceSection(merged),
+                  imageUrl: combinedImages[0] || current.imageUrl || loc.imageUrl,
+                  images: combinedImages.length > 0 ? combinedImages : undefined,
                 });
               }
             }
           }
         }
 
-        const finalSources = Array.from(byId.values());
+        const rawFinalSources = Array.from(byId.values());
+        const finalSources: Source[] = [];
+        for (const s of rawFinalSources) {
+          if (isStudioBuildMode) {
+            finalSources.push(await optimizeSourceForSync(s));
+          } else {
+            finalSources.push(s);
+          }
+        }
 
         // Index all canonical sources into local vector chunks
         const allIndexedChunks: VectorChunk[] = [];
@@ -427,77 +605,53 @@ export default function App() {
         setIsLoadingArchive(false);
       }
     }
-    init();
+    init().catch(() => {});
   }, []);
 
   // Ingest new source with automated vector indexing (Google Studio Author Only)
   const handleAddSource = async (newSource: Source) => {
     if (!isStudioBuildMode) return;
-    const enriched: Source = {
-      ...newSource,
-      updatedAt: Date.now(),
-    };
-    const chunks = await indexSource(enriched);
-    const nextSources = [enriched, ...sources];
-    setSources(nextSources);
-    setVectorChunks((prev) => [...chunks, ...prev]);
-    setSelectedSourceIds((prev) => [enriched.id, ...prev]);
-
-    setSyncStatus('syncing');
     try {
-      const res = await fetch('/api/archive/source', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({ source: enriched }),
+      const optimized = await optimizeSourceForSync({
+        ...newSource,
+        updatedAt: Date.now(),
       });
-      if (res.ok) {
-        setSyncedStats(computeLocalStats(nextSources));
-        setSyncStatus('synced');
-      } else {
-        setSyncStatus('error');
-      }
+      const chunks = await indexSource(optimized);
+      const nextSources = [optimized, ...sources];
+      setSources(nextSources);
+      setVectorChunks((prev) => [...chunks, ...prev]);
+      setSelectedSourceIds((prev) => [optimized.id, ...prev]);
+
+      await publishArchiveToPublic(nextSources);
     } catch (err) {
-      console.warn('Failed to persist new source to server:', err);
-      setSyncStatus('error');
+      console.warn('Failed to add source:', err);
     }
   };
 
   // Update existing source (title, passages, author, pictures, and all fields) and re-index vectors
   const handleUpdateSource = async (updatedSource: Source) => {
     if (!isStudioBuildMode) return;
-    const enriched: Source = {
-      ...updatedSource,
-      updatedAt: Date.now(),
-    };
-    const newChunks = await indexSource(enriched);
-    const nextSources = sources.map((s) =>
-      s.id === enriched.id ? enriched : s
-    );
-    setSources(nextSources);
-    setVectorChunks((prev) => [
-      ...prev.filter((c) => c.sourceId !== enriched.id),
-      ...newChunks,
-    ]);
-    setActiveSourceDetail((prev) =>
-      prev && prev.id === enriched.id ? enriched : prev
-    );
-
-    setSyncStatus('syncing');
     try {
-      const res = await fetch('/api/archive/source', {
-        method: 'POST',
-        headers: getAdminHeaders(),
-        body: JSON.stringify({ source: enriched }),
+      const optimized = await optimizeSourceForSync({
+        ...updatedSource,
+        updatedAt: Date.now(),
       });
-      if (res.ok) {
-        setSyncedStats(computeLocalStats(nextSources));
-        setSyncStatus('synced');
-      } else {
-        setSyncStatus('error');
-      }
+      const newChunks = await indexSource(optimized);
+      const nextSources = sources.map((s) =>
+        s.id === optimized.id ? optimized : s
+      );
+      setSources(nextSources);
+      setVectorChunks((prev) => [
+        ...prev.filter((c) => c.sourceId !== optimized.id),
+        ...newChunks,
+      ]);
+      setActiveSourceDetail((prev) =>
+        prev && prev.id === optimized.id ? optimized : prev
+      );
+
+      await publishArchiveToPublic(nextSources);
     } catch (err) {
-      console.warn('Failed to persist updated source to server:', err);
-      setSyncStatus('error');
+      console.warn('Failed to update source:', err);
     }
   };
 
@@ -507,35 +661,42 @@ export default function App() {
     dataUrls: string[]
   ) => {
     if (!isStudioBuildMode || dataUrls.length === 0) return;
-    const existingImages = getSourceImages(targetSource);
-    const mergedImages = [...existingImages];
-    for (const url of dataUrls) {
-      if (url && !mergedImages.includes(url)) {
-        mergedImages.push(url);
+    try {
+      const existingImages = getSourceImages(targetSource);
+      const mergedImages = [...existingImages];
+      for (const url of dataUrls) {
+        if (url) {
+          const opt = await optimizeImageDataUrl(url);
+          if (opt && !mergedImages.includes(opt)) {
+            mergedImages.push(opt);
+          }
+        }
       }
+      const updatedSource: Source = {
+        ...targetSource,
+        imageUrl: mergedImages[0] || targetSource.imageUrl,
+        images: mergedImages,
+        updatedAt: Date.now(),
+      };
+      await handleUpdateSource(updatedSource);
+    } catch (err) {
+      console.warn('Failed to add pictures to source:', err);
     }
-    const updatedSource: Source = {
-      ...targetSource,
-      imageUrl: mergedImages[0] || targetSource.imageUrl,
-      images: mergedImages,
-      updatedAt: Date.now(),
-    };
-    await handleUpdateSource(updatedSource);
   };
 
   // Delete source and its vector chunks (Google Studio Author Only)
   const handleDeleteSource = async (id: string) => {
     if (!isStudioBuildMode) return;
-    await removeSourceFromDB(id, true);
-    const nextSources = sources.filter((s) => s.id !== id);
-    setSources(nextSources);
-    setVectorChunks((prev) => prev.filter((c) => c.sourceId !== id));
-    setSelectedSourceIds((prev) => prev.filter((itemId) => itemId !== id));
-    setActiveSourceDetail((prev) => (prev && prev.id === id ? null : prev));
-    setEditingSource((prev) => (prev && prev.id === id ? null : prev));
-
-    setSyncStatus('syncing');
     try {
+      await removeSourceFromDB(id, true);
+      const nextSources = sources.filter((s) => s.id !== id);
+      setSources(nextSources);
+      setVectorChunks((prev) => prev.filter((c) => c.sourceId !== id));
+      setSelectedSourceIds((prev) => prev.filter((itemId) => itemId !== id));
+      setActiveSourceDetail((prev) => (prev && prev.id === id ? null : prev));
+      setEditingSource((prev) => (prev && prev.id === id ? null : prev));
+
+      setSyncStatus('syncing');
       const res = await fetch(`/api/archive/source/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: getAdminHeaders(),
@@ -544,7 +705,7 @@ export default function App() {
         setSyncedStats(computeLocalStats(nextSources));
         setSyncStatus('synced');
       } else {
-        setSyncStatus('error');
+        await publishArchiveToPublic(nextSources);
       }
     } catch (err) {
       console.warn('Failed to delete source on server:', err);
@@ -569,17 +730,21 @@ export default function App() {
   // Reset book metadata & archive to default (Google Studio Author Only)
   const handleResetToDefault = async () => {
     if (!isStudioBuildMode) return;
-    clearDeletedSourcesRegistry();
-    setBookMetadata(defaultBookMetadata);
-    const allIndexedChunks: VectorChunk[] = [];
-    for (const s of seedSources) {
-      const chunks = await indexSource(s);
-      allIndexedChunks.push(...chunks);
+    try {
+      clearDeletedSourcesRegistry();
+      setBookMetadata(defaultBookMetadata);
+      const allIndexedChunks: VectorChunk[] = [];
+      for (const s of seedSources) {
+        const chunks = await indexSource(s);
+        allIndexedChunks.push(...chunks);
+      }
+      setSources(seedSources);
+      setVectorChunks(allIndexedChunks);
+      setSelectedSourceIds(seedSources.map((s) => s.id));
+      await publishArchiveToPublic(seedSources, [], defaultBookMetadata);
+    } catch (err) {
+      console.warn('Failed to reset archive:', err);
     }
-    setSources(seedSources);
-    setVectorChunks(allIndexedChunks);
-    setSelectedSourceIds(seedSources.map((s) => s.id));
-    await publishArchiveToPublic(seedSources, [], defaultBookMetadata);
   };
 
   // Core Conversational Query Handler
@@ -737,7 +902,7 @@ export default function App() {
   );
 
   return (
-    <div className="min-h-screen bg-[#FAF7F2] text-[#2A2022] flex flex-col font-sans selection:bg-[#F8DEE3] selection:text-[#7A2B3A]">
+    <div className="min-h-screen bg-[#FFFFFF] text-[#0B0B0C] flex flex-col font-sans selection:bg-[#E8EAED] selection:text-[#0B0B0C]">
       {/* Global Header */}
       <Header
         currentView={currentView}
@@ -850,8 +1015,8 @@ export default function App() {
 
       {/* SEMANTIC VECTOR SEARCH MODAL OVERLAY */}
       {isSemanticSearchOpen && (
-        <div className="fixed inset-0 z-50 bg-[#1F1718]/65 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-[#FAF7F2] w-full max-w-4xl h-[85vh] rounded-2xl shadow-2xl border border-[#EAE1D9] flex flex-col overflow-hidden">
+        <div className="fixed inset-0 z-50 bg-[#0B0B0C]/65 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#FFFFFF] w-full max-w-4xl h-[85vh] rounded-3xl flex flex-col overflow-hidden">
             <SemanticSearchPanel
               allChunks={vectorChunks}
               allSources={sources}

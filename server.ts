@@ -766,12 +766,330 @@ app.post('/api/generate-artifact', async (req, res) => {
   }
 });
 
-// 8. Health check
+// ============================================================================
+// 8. PERSISTENT ARCHIVE & PICTURE STORE (Public Read, Google Studio Admin Write)
+// ============================================================================
+const ARCHIVE_STORE_PATH = path.resolve(__dirname, 'archive-store.json');
+const PUBLIC_ARCHIVE_STORE_PATH = path.resolve(__dirname, 'public', 'archive-store.json');
+
+interface PersistedArchiveStore {
+  sources: any[];
+  deletedIds: string[];
+  bookMetadata?: any;
+  updatedAt: number;
+}
+
+let cachedArchiveStore: PersistedArchiveStore | null = null;
+
+function readSingleStoreFile(filePath: string): PersistedArchiveStore | null {
+  try {
+    if (fs.existsSync(filePath)) {
+      const raw = fs.readFileSync(filePath, 'utf-8');
+      const parsed = JSON.parse(raw);
+      return {
+        sources: Array.isArray(parsed.sources) ? parsed.sources : [],
+        deletedIds: Array.isArray(parsed.deletedIds) ? parsed.deletedIds : [],
+        bookMetadata: parsed.bookMetadata || undefined,
+        updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now(),
+      };
+    }
+  } catch (err) {
+    console.warn(`Could not read ${filePath}:`, err);
+  }
+  return null;
+}
+
+function readArchiveStore(): PersistedArchiveStore {
+  if (cachedArchiveStore) {
+    return cachedArchiveStore;
+  }
+
+  const primary = readSingleStoreFile(ARCHIVE_STORE_PATH);
+  const pub = readSingleStoreFile(PUBLIC_ARCHIVE_STORE_PATH);
+
+  if (primary && pub) {
+    cachedArchiveStore = primary.updatedAt >= pub.updatedAt ? primary : pub;
+    return cachedArchiveStore;
+  }
+  if (primary) {
+    cachedArchiveStore = primary;
+    return cachedArchiveStore;
+  }
+  if (pub) {
+    cachedArchiveStore = pub;
+    return cachedArchiveStore;
+  }
+
+  cachedArchiveStore = {
+    sources: [],
+    deletedIds: [],
+    updatedAt: 0,
+  };
+  return cachedArchiveStore;
+}
+
+function writeArchiveStore(store: PersistedArchiveStore): void {
+  store.updatedAt = Date.now();
+  cachedArchiveStore = store;
+  const serialized = JSON.stringify(store, null, 2);
+  try {
+    fs.writeFileSync(ARCHIVE_STORE_PATH, serialized, 'utf-8');
+  } catch (err) {
+    console.error('Failed to write root archive-store.json:', err);
+  }
+  try {
+    const pubDir = path.dirname(PUBLIC_ARCHIVE_STORE_PATH);
+    if (!fs.existsSync(pubDir)) {
+      fs.mkdirSync(pubDir, { recursive: true });
+    }
+    fs.writeFileSync(PUBLIC_ARCHIVE_STORE_PATH, serialized, 'utf-8');
+  } catch (err) {
+    console.error('Failed to write public/archive-store.json:', err);
+  }
+}
+
+/**
+ * Verifies that a mutation request originates exclusively from the author's
+ * Google AI Studio Build environment and NEVER from the public shared link (ais-pre-*).
+ */
+function isStudioAdminRequest(req: express.Request): boolean {
+  const adminHeader = String(
+    req.headers['x-studio-admin'] || req.headers['x-studio-author'] || ''
+  ).toLowerCase();
+  if (adminHeader !== 'true') return false;
+
+  const clientHost = String(req.headers['x-client-hostname'] || '').toLowerCase();
+  const origin = String(req.headers.origin || '').toLowerCase();
+  const referer = String(req.headers.referer || '').toLowerCase();
+
+  // Strictly block any write attempt coming from the public shared preview URL
+  if (
+    clientHost.startsWith('ais-pre-') ||
+    origin.includes('ais-pre-') ||
+    referer.includes('ais-pre-')
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function getNormalizedSourceImages(s: any): string[] {
+  const list: string[] = [];
+  if (s && Array.isArray(s.images)) {
+    for (const img of s.images) {
+      if (img && typeof img === 'string' && !list.includes(img)) {
+        list.push(img);
+      }
+    }
+  }
+  if (s && s.imageUrl && typeof s.imageUrl === 'string' && !list.includes(s.imageUrl)) {
+    list.unshift(s.imageUrl);
+  }
+  return list;
+}
+
+function getNormalizedSourceSection(s: any): 'authored' | 'references' {
+  if (!s) return 'authored';
+  if (s.section === 'references') return 'references';
+  if (s.type === 'citation' || s.type === 'book') return 'references';
+  if (s.section === 'authored') return 'authored';
+  if (
+    s.type === 'chapter' ||
+    s.type === 'article' ||
+    (s.author && String(s.author).toLowerCase().includes('catalina'))
+  ) {
+    return 'authored';
+  }
+  return 'references';
+}
+
+function computeArchiveStats(sources: any[]) {
+  let photoCount = 0;
+  let citationCount = 0;
+  for (const s of sources) {
+    if (!s) continue;
+    const imgs = getNormalizedSourceImages(s);
+    photoCount += imgs.length;
+    if (getNormalizedSourceSection(s) === 'references') {
+      citationCount += 1;
+    }
+  }
+  return {
+    totalSources: sources.length,
+    photoCount,
+    citationCount,
+  };
+}
+
+// Public GET /api/archive and /archive-store.json:
+// Everyone can view the canonical archive and all authored work reference pictures & citations
+app.get(['/api/archive', '/archive-store.json'], (_req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+  const store = readArchiveStore();
+  const stats = computeArchiveStats(store.sources);
+  return res.json({
+    ...store,
+    stats,
+  });
+});
+
+// Studio Admin POST /api/archive/sync: Syncs author's local Studio sources, citations & pictures to server store
+app.post('/api/archive/sync', (req, res) => {
+  if (!isStudioAdminRequest(req)) {
+    return res.status(403).json({
+      error: 'Forbidden: Only the author in Google AI Studio can modify the archive.',
+    });
+  }
+
+  const incomingSources = Array.isArray(req.body?.sources) ? req.body.sources : [];
+  const incomingDeletedIds = Array.isArray(req.body?.deletedIds) ? req.body.deletedIds : [];
+  const incomingMetadata = req.body?.bookMetadata;
+
+  const store = readArchiveStore();
+  const deletedSet = new Set<string>([...store.deletedIds, ...incomingDeletedIds]);
+
+  const byId = new Map<string, any>();
+  for (const s of store.sources) {
+    if (s && s.id && !deletedSet.has(s.id)) {
+      byId.set(s.id, s);
+    }
+  }
+
+  for (const inc of incomingSources) {
+    if (!inc || !inc.id || deletedSet.has(inc.id)) continue;
+    const existing = byId.get(inc.id);
+    const resolvedSection = getNormalizedSourceSection(inc);
+    if (!existing) {
+      const incImgs = getNormalizedSourceImages(inc);
+      byId.set(inc.id, {
+        ...inc,
+        section: resolvedSection,
+        imageUrl: incImgs[0] || inc.imageUrl,
+        images: incImgs.length > 0 ? incImgs : undefined,
+      });
+    } else {
+      // Merge incoming Studio state while preserving any existing images if incoming omitted them
+      const incImages = getNormalizedSourceImages(inc);
+      const exImages = getNormalizedSourceImages(existing);
+      const mergedImages = incImages.length > 0 ? incImages : exImages;
+      const mergedImageUrl = mergedImages[0] || inc.imageUrl || existing.imageUrl;
+
+      byId.set(inc.id, {
+        ...existing,
+        ...inc,
+        section: resolvedSection,
+        imageUrl: mergedImageUrl,
+        images: mergedImages.length > 0 ? mergedImages : undefined,
+      });
+    }
+  }
+
+  store.sources = Array.from(byId.values());
+  store.deletedIds = Array.from(deletedSet);
+  if (incomingMetadata && typeof incomingMetadata === 'object') {
+    store.bookMetadata = incomingMetadata;
+  }
+
+  writeArchiveStore(store);
+  const stats = computeArchiveStats(store.sources);
+  return res.json({
+    ...store,
+    stats,
+  });
+});
+
+// Studio Admin POST /api/archive/source: Create or update a single card (including pictures & citations)
+app.post('/api/archive/source', (req, res) => {
+  if (!isStudioAdminRequest(req)) {
+    return res.status(403).json({
+      error: 'Forbidden: Only the author in Google AI Studio can create, edit, or add pictures to cards.',
+    });
+  }
+
+  const source = req.body?.source;
+  if (!source || !source.id) {
+    return res.status(400).json({ error: 'Valid source object is required.' });
+  }
+
+  const store = readArchiveStore();
+  store.deletedIds = store.deletedIds.filter((id) => id !== source.id);
+
+  const normalizedImages = getNormalizedSourceImages(source);
+  const enrichedSource = {
+    ...source,
+    section: getNormalizedSourceSection(source),
+    imageUrl: normalizedImages[0] || undefined,
+    images: normalizedImages.length > 0 ? normalizedImages : undefined,
+    updatedAt: Date.now(),
+  };
+
+  const idx = store.sources.findIndex((s) => s.id === source.id);
+  if (idx >= 0) {
+    store.sources[idx] = enrichedSource;
+  } else {
+    store.sources.unshift(enrichedSource);
+  }
+
+  writeArchiveStore(store);
+  const stats = computeArchiveStats(store.sources);
+  return res.json({ status: 'ok', source: enrichedSource, store, stats });
+});
+
+// Studio Admin DELETE /api/archive/source/:id: Delete a card from the archive
+app.delete('/api/archive/source/:id', (req, res) => {
+  if (!isStudioAdminRequest(req)) {
+    return res.status(403).json({
+      error: 'Forbidden: Only the author in Google AI Studio can delete cards.',
+    });
+  }
+
+  const targetId = req.params.id;
+  if (!targetId) {
+    return res.status(400).json({ error: 'Source ID is required.' });
+  }
+
+  const store = readArchiveStore();
+  store.sources = store.sources.filter((s) => s.id !== targetId);
+  if (!store.deletedIds.includes(targetId)) {
+    store.deletedIds.push(targetId);
+  }
+
+  writeArchiveStore(store);
+  const stats = computeArchiveStats(store.sources);
+  return res.json({ status: 'ok', deletedId: targetId, store, stats });
+});
+
+// Studio Admin POST /api/archive/metadata: Save book metadata
+app.post('/api/archive/metadata', (req, res) => {
+  if (!isStudioAdminRequest(req)) {
+    return res.status(403).json({
+      error: 'Forbidden: Only the author in Google AI Studio can update book metadata.',
+    });
+  }
+
+  const metadata = req.body?.bookMetadata;
+  if (!metadata || typeof metadata !== 'object') {
+    return res.status(400).json({ error: 'Valid bookMetadata object is required.' });
+  }
+
+  const store = readArchiveStore();
+  store.bookMetadata = metadata;
+  writeArchiveStore(store);
+  return res.json({ status: 'ok', bookMetadata: store.bookMetadata });
+});
+
+// Serve static public assets in both dev and prod
+app.use('/assets', express.static(path.resolve(__dirname, 'public', 'assets')));
+
+// 9. Health check
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', service: 'FolioLM Server', time: new Date().toISOString() });
 });
 
-// 9. Catch-all for unmatched /api/* routes so they never return HTML
+// 10. Catch-all for unmatched /api/* routes so they never return HTML
 app.all('/api/*', (req, res) => {
   res.status(404).json({ error: `API endpoint ${req.method} ${req.originalUrl} not found.` });
 });
@@ -991,275 +1309,10 @@ Speak in Catalina's warm, direct, fierce, and philosophical voice (resonant alto
   });
 });
 
-// ============================================================================
-// PERSISTENT ARCHIVE & PICTURE STORE (Public Read, Google Studio Admin Write)
-// ============================================================================
-const ARCHIVE_STORE_PATH = path.resolve(__dirname, 'archive-store.json');
-const PUBLIC_ARCHIVE_STORE_PATH = path.resolve(__dirname, 'public', 'archive-store.json');
-
-interface PersistedArchiveStore {
-  sources: any[];
-  deletedIds: string[];
-  bookMetadata?: any;
-  updatedAt: number;
-}
-
-function readSingleStoreFile(filePath: string): PersistedArchiveStore | null {
-  try {
-    if (fs.existsSync(filePath)) {
-      const raw = fs.readFileSync(filePath, 'utf-8');
-      const parsed = JSON.parse(raw);
-      return {
-        sources: Array.isArray(parsed.sources) ? parsed.sources : [],
-        deletedIds: Array.isArray(parsed.deletedIds) ? parsed.deletedIds : [],
-        bookMetadata: parsed.bookMetadata || undefined,
-        updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now(),
-      };
-    }
-  } catch (err) {
-    console.warn(`Could not read ${filePath}:`, err);
-  }
-  return null;
-}
-
-function readArchiveStore(): PersistedArchiveStore {
-  const primary = readSingleStoreFile(ARCHIVE_STORE_PATH);
-  const pub = readSingleStoreFile(PUBLIC_ARCHIVE_STORE_PATH);
-
-  if (primary && pub) {
-    return primary.updatedAt >= pub.updatedAt ? primary : pub;
-  }
-  if (primary) return primary;
-  if (pub) return pub;
-
-  return {
-    sources: [],
-    deletedIds: [],
-    updatedAt: 0,
-  };
-}
-
-function writeArchiveStore(store: PersistedArchiveStore): void {
-  store.updatedAt = Date.now();
-  const serialized = JSON.stringify(store, null, 2);
-  try {
-    fs.writeFileSync(ARCHIVE_STORE_PATH, serialized, 'utf-8');
-  } catch (err) {
-    console.error('Failed to write root archive-store.json:', err);
-  }
-  try {
-    const pubDir = path.dirname(PUBLIC_ARCHIVE_STORE_PATH);
-    if (!fs.existsSync(pubDir)) {
-      fs.mkdirSync(pubDir, { recursive: true });
-    }
-    fs.writeFileSync(PUBLIC_ARCHIVE_STORE_PATH, serialized, 'utf-8');
-  } catch (err) {
-    console.error('Failed to write public/archive-store.json:', err);
-  }
-}
-
-/**
- * Verifies that a mutation request originates exclusively from the author's
- * Google AI Studio Build environment and NEVER from the public shared link (ais-pre-*).
- * Handles Cloud Run reverse-proxy header rewriting where Host/Origin may be internal.
- */
-function isStudioAdminRequest(req: express.Request): boolean {
-  const adminHeader = String(
-    req.headers['x-studio-admin'] || req.headers['x-studio-author'] || ''
-  ).toLowerCase();
-  if (adminHeader !== 'true') return false;
-
-  const origin = String(req.headers.origin || '').toLowerCase();
-  const referer = String(req.headers.referer || '').toLowerCase();
-  const forwardedHost = String(req.headers['x-forwarded-host'] || '').toLowerCase();
-  const host = String(req.headers.host || '').toLowerCase();
-  const clientHost = String(req.headers['x-client-hostname'] || '').toLowerCase();
-
-  const combined = `${origin} ${referer} ${forwardedHost} ${host} ${clientHost}`;
-  // Strictly block any write attempt coming from the public shared preview URL
-  if (combined.includes('ais-pre-')) {
-    return false;
-  }
-
-  return true;
-}
-
-function computeArchiveStats(sources: any[]) {
-  let photoCount = 0;
-  let citationCount = 0;
-  for (const s of sources) {
-    if (!s) continue;
-    const imgs = Array.isArray(s.images) ? s.images.filter(Boolean).length : 0;
-    if (imgs > 0) {
-      photoCount += imgs;
-    } else if (s.imageUrl) {
-      photoCount += 1;
-    }
-    const isRef =
-      s.section === 'references' ||
-      (!s.section &&
-        (s.type === 'citation' ||
-          s.type === 'book' ||
-          (s.type !== 'chapter' &&
-            s.type !== 'article' &&
-            !(s.author && String(s.author).toLowerCase().includes('catalina')))));
-    if (isRef) {
-      citationCount += 1;
-    }
-  }
-  return {
-    totalSources: sources.length,
-    photoCount,
-    citationCount,
-  };
-}
-
-// Public GET: Everyone can view the canonical archive and all authored work reference pictures & citations
-app.get('/api/archive', (_req, res) => {
-  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-  res.setHeader('Pragma', 'no-cache');
-  res.setHeader('Expires', '0');
-  const store = readArchiveStore();
-  const stats = computeArchiveStats(store.sources);
-  return res.json({
-    ...store,
-    stats,
-  });
-});
-
-// Studio Admin POST /api/archive/sync: Syncs author's local Studio sources, citations & pictures to server store
-app.post('/api/archive/sync', (req, res) => {
-  if (!isStudioAdminRequest(req)) {
-    return res.status(403).json({
-      error: 'Forbidden: Only the author in Google AI Studio can modify the archive.',
-    });
-  }
-
-  const incomingSources = Array.isArray(req.body?.sources) ? req.body.sources : [];
-  const incomingDeletedIds = Array.isArray(req.body?.deletedIds) ? req.body.deletedIds : [];
-  const incomingMetadata = req.body?.bookMetadata;
-
-  const store = readArchiveStore();
-  const deletedSet = new Set<string>([...store.deletedIds, ...incomingDeletedIds]);
-
-  const byId = new Map<string, any>();
-  for (const s of store.sources) {
-    if (s && s.id && !deletedSet.has(s.id)) {
-      byId.set(s.id, s);
-    }
-  }
-
-  for (const inc of incomingSources) {
-    if (!inc || !inc.id || deletedSet.has(inc.id)) continue;
-    const existing = byId.get(inc.id);
-    if (!existing) {
-      byId.set(inc.id, inc);
-    } else {
-      // Merge incoming Studio state while preserving any existing images if incoming omitted them
-      const incImages = Array.isArray(inc.images) ? inc.images.filter(Boolean) : [];
-      const exImages = Array.isArray(existing.images) ? existing.images.filter(Boolean) : [];
-      const mergedImages = incImages.length > 0 ? incImages : exImages;
-      const mergedImageUrl = inc.imageUrl || existing.imageUrl || mergedImages[0];
-
-      byId.set(inc.id, {
-        ...existing,
-        ...inc,
-        imageUrl: mergedImageUrl,
-        images: mergedImages.length > 0 ? mergedImages : undefined,
-      });
-    }
-  }
-
-  store.sources = Array.from(byId.values());
-  store.deletedIds = Array.from(deletedSet);
-  if (incomingMetadata && typeof incomingMetadata === 'object') {
-    store.bookMetadata = incomingMetadata;
-  }
-
-  writeArchiveStore(store);
-  const stats = computeArchiveStats(store.sources);
-  return res.json({
-    ...store,
-    stats,
-  });
-});
-
-// Studio Admin POST /api/archive/source: Create or update a single card (including pictures)
-app.post('/api/archive/source', (req, res) => {
-  if (!isStudioAdminRequest(req)) {
-    return res.status(403).json({
-      error: 'Forbidden: Only the author in Google AI Studio can create, edit, or add pictures to cards.',
-    });
-  }
-
-  const source = req.body?.source;
-  if (!source || !source.id) {
-    return res.status(400).json({ error: 'Valid source object is required.' });
-  }
-
-  const store = readArchiveStore();
-  store.deletedIds = store.deletedIds.filter((id) => id !== source.id);
-
-  const enrichedSource = {
-    ...source,
-    updatedAt: Date.now(),
-  };
-
-  const idx = store.sources.findIndex((s) => s.id === source.id);
-  if (idx >= 0) {
-    store.sources[idx] = enrichedSource;
-  } else {
-    store.sources.unshift(enrichedSource);
-  }
-
-  writeArchiveStore(store);
-  return res.json({ status: 'ok', source: enrichedSource, store });
-});
-
-// Studio Admin DELETE /api/archive/source/:id: Delete a card from the archive
-app.delete('/api/archive/source/:id', (req, res) => {
-  if (!isStudioAdminRequest(req)) {
-    return res.status(403).json({
-      error: 'Forbidden: Only the author in Google AI Studio can delete cards.',
-    });
-  }
-
-  const targetId = req.params.id;
-  if (!targetId) {
-    return res.status(400).json({ error: 'Source ID is required.' });
-  }
-
-  const store = readArchiveStore();
-  store.sources = store.sources.filter((s) => s.id !== targetId);
-  if (!store.deletedIds.includes(targetId)) {
-    store.deletedIds.push(targetId);
-  }
-
-  writeArchiveStore(store);
-  return res.json({ status: 'ok', deletedId: targetId, store });
-});
-
-// Studio Admin POST /api/archive/metadata: Save book metadata
-app.post('/api/archive/metadata', (req, res) => {
-  if (!isStudioAdminRequest(req)) {
-    return res.status(403).json({
-      error: 'Forbidden: Only the author in Google AI Studio can update book metadata.',
-    });
-  }
-
-  const metadata = req.body?.bookMetadata;
-  if (!metadata || typeof metadata !== 'object') {
-    return res.status(400).json({ error: 'Valid bookMetadata object is required.' });
-  }
-
-  const store = readArchiveStore();
-  store.bookMetadata = metadata;
-  writeArchiveStore(store);
-  return res.json({ status: 'ok', bookMetadata: store.bookMetadata });
-});
-
 // Mount Vite or serve static files
 async function startServer() {
+  app.use('/assets', express.static(path.resolve(__dirname, 'public', 'assets')));
+
   if (!isProd) {
     const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
@@ -1267,6 +1320,10 @@ async function startServer() {
         middlewareMode: true,
         host: '0.0.0.0',
         port: port,
+        hmr: false,
+        watch: {
+          ignored: ['**/archive-store.json', '**/public/archive-store.json'],
+        },
       },
       appType: 'spa',
     });

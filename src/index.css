@@ -1,26 +1,53 @@
 @import "tailwindcss";
 
+@theme {
+  --font-sans: 'Google Sans Text', 'Google Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-display: 'Google Sans Display', 'Google Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-serif: 'Google Sans Display', 'Google Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'Google Sans Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
 @layer base {
   :root {
-    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    --font-serif: 'Newsreader', Georgia, Cambria, 'Times New Roman', Times, serif;
-    --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    --font-sans: 'Google Sans Text', 'Google Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-display: 'Google Sans Display', 'Google Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-serif: 'Google Sans Display', 'Google Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-mono: 'Google Sans Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   }
 
   body {
     font-family: var(--font-sans);
+    background-color: #FFFFFF;
+    color: #0B0B0C;
+  }
+
+  h1, h2, h3, h4, blockquote {
+    font-family: var(--font-display);
+  }
+
+  *:not(.real-published-book):not(.real-published-book *),
+  *:not(.real-published-book):not(.real-published-book *)::before,
+  *:not(.real-published-book):not(.real-published-book *)::after {
+    border-style: none !important;
+    border-width: 0 !important;
+    box-shadow: none !important;
+    --tw-shadow: 0 0 #0000 !important;
+    --tw-ring-shadow: 0 0 #0000 !important;
   }
 }
 
-.font-serif-book {
-  font-family: var(--font-serif);
+.font-serif-book,
+.font-display {
+  font-family: var(--font-display);
+  font-optical-sizing: auto;
 }
 
-.font-mono-code {
+.font-mono-code,
+.font-mono {
   font-family: var(--font-mono);
 }
 
-/* Custom discreet scrollbars */
+/* Custom discreet Google Labs neutral scrollbars */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -29,11 +56,11 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: rgba(200, 90, 110, 0.25);
+  background: rgba(32, 33, 36, 0.2);
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(200, 90, 110, 0.5);
+  background: rgba(32, 33, 36, 0.4);
 }
 
 /* Prevent downloading, dragging, or touch-callout saving on archive pictures */
@@ -54,4 +81,116 @@
   -webkit-user-select: none;
   user-select: none;
 }
+
+/* ============================================================================
+   REAL PUBLISHED HARDCOVER BOOK (FLAT ON INVISIBLE SURFACE)
+   ============================================================================ */
+.real-published-book {
+  position: relative;
+  border-radius: 32px;
+  background: radial-gradient(
+    ellipse 88% 82% at 50% 48%,
+    #dce3f0 0%,
+    #e5daf0 42%,
+    #f3ece4 74%,
+    #faf7f2 100%
+  );
+}
+
+.published-book-flat {
+  position: relative;
+  transition: transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+
+.real-published-book:hover .published-book-flat {
+  transform: translateY(-4px) scale(1.012);
+}
+
+/* Subtle Multi-Layer Contact Shadow on an Invisible Surface */
+.published-book-back-board {
+  position: absolute;
+  top: 2px;
+  bottom: -5px;
+  left: 1px;
+  right: -6px;
+  border-radius: 3px 6px 6px 3px;
+  background: linear-gradient(180deg, #242629 0%, #17181b 60%, #101113 100%);
+  box-shadow:
+    0 28px 52px -10px rgba(28, 22, 38, 0.30),
+    0 14px 26px -6px rgba(28, 22, 38, 0.20),
+    0 4px 10px -2px rgba(24, 18, 28, 0.16);
+}
+
+/* Subtle Fore-Edge & Bottom Paper Page Stack Visible Around Flat Book */
+.published-book-flat-pages {
+  position: absolute;
+  top: 3px;
+  bottom: -3px;
+  left: 3px;
+  right: -4px;
+  border-radius: 2px 5px 5px 2px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      #fdfbf7 0px,
+      #f2ece1 1px,
+      #e5dccf 2px,
+      #faf6f0 3px
+    );
+  box-shadow:
+    inset -1px -1px 2px rgba(0, 0, 0, 0.14),
+    1px 1px 2px rgba(0, 0, 0, 0.12);
+}
+
+/* Front Hardcover Board — Positioned Flat & Clearly Visible */
+.published-book-front {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 3px 5px 5px 3px;
+  background: #ffffff;
+  overflow: hidden;
+  box-shadow:
+    1px 1px 2px rgba(0, 0, 0, 0.16),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.07),
+    inset 0 1px 1px rgba(255, 255, 255, 0.65);
+}
+
+/* Authentic Hardcover Spine Round & French Groove Crease on Left Edge */
+.published-book-hinge {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 18px;
+  pointer-events: none;
+  z-index: 10;
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.34) 0%,
+    rgba(255, 255, 255, 0.36) 16%,
+    rgba(255, 255, 255, 0.06) 36%,
+    rgba(0, 0, 0, 0.24) 54%,
+    rgba(0, 0, 0, 0.08) 64%,
+    rgba(255, 255, 255, 0.46) 78%,
+    rgba(255, 255, 255, 0) 100%
+  );
+}
+
+/* Subtle Matte Print Lamination Finish */
+.published-book-sheen {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 11;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.14) 0%,
+    rgba(255, 255, 255, 0.02) 42%,
+    rgba(0, 0, 0, 0.0) 70%,
+    rgba(0, 0, 0, 0.06) 100%
+  );
+}
+
+
+
 

@@ -245,7 +245,7 @@ export const VoiceSettingsModal: React.FC<VoiceSettingsModalProps> = ({
     setPlayingSampleStep(step);
     audio.onended = () => setPlayingSampleStep(null);
     audio.onerror = () => setPlayingSampleStep(null);
-    audio.play();
+    audio.play().catch(() => setPlayingSampleStep(null));
   };
 
   const handleCreateClonedVoice = async () => {
