@@ -88,13 +88,7 @@
 .real-published-book {
   position: relative;
   border-radius: 32px;
-  background: radial-gradient(
-    ellipse 88% 82% at 50% 48%,
-    #dce3f0 0%,
-    #e5daf0 42%,
-    #f3ece4 74%,
-    #faf7f2 100%
-  );
+  background: #ffffff;
 }
 
 .published-book-flat {

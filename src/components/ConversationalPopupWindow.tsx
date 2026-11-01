@@ -115,10 +115,8 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
 
   const sampleQuestions = [
     'Why is love not an emotion, but a life force?',
-    'How does love expand the adjacent possible?',
+    'How does self-love emergy from a natural law like syntropy?',
     'What are the five dimensions of love?',
-    'How do algorithms commodify self-love?',
-    'What is relational sovereignty?',
   ];
 
   const handleSampleClick = async (q: string) => {
@@ -131,7 +129,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
         <button
           onClick={onToggle}
           className="fixed bottom-5 right-5 z-40 px-5 py-3.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2.5 font-sans font-medium text-xs tracking-wide group cursor-pointer"
-          title="Open Conversational Manuscript"
+          title="Ask Manuscript"
         >
           <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
             <Heart className="w-3.5 h-3.5 text-white fill-white" />
@@ -168,7 +166,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                 <button
                   onClick={onClearChat}
                   className="p-1.5 rounded-full text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#F1F3F4] transition-colors cursor-pointer"
-                  title="Reset conversation thread"
+                  title="Reset conversation"
                 >
                   <RotateCcw className="w-4 h-4" />
                 </button>
@@ -177,7 +175,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
               <button
                 onClick={onToggle}
                 className="p-1.5 rounded-full text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#F1F3F4] transition-colors cursor-pointer"
-                title="Minimize window"
+                title="Minimize"
               >
                 <Minus className="w-4 h-4" />
               </button>
@@ -185,7 +183,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
               <button
                 onClick={onToggle}
                 className="p-1.5 rounded-full text-[#5F6368] hover:text-white hover:bg-[#FF2A6D] transition-colors cursor-pointer"
-                title="Close window"
+                title="Close"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -203,7 +201,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                     ? 'bg-[#FF2A6D] text-white'
                     : 'text-[#5F6368] hover:text-[#0B0B0C]'
                 }`}
-                title="Fast responses (gemini-3.1-flash-lite)"
+                title="Fast responses"
               >
                 Fast
               </button>
@@ -215,7 +213,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                     ? 'bg-[#FF2A6D] text-white'
                     : 'text-[#5F6368] hover:text-[#0B0B0C]'
                 }`}
-                title="General grounded tasks (gemini-3.8-flash)"
+                title="General"
               >
                 Balanced
               </button>
@@ -227,7 +225,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                     ? 'bg-[#FF2A6D] text-white'
                     : 'text-[#5F6368] hover:text-[#0B0B0C]'
                 }`}
-                title="Deep reasoning (gemini-4-argon)"
+                title="Deep reasoning"
               >
                 Deep Pro
               </button>
@@ -236,7 +234,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
             <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#5F6368] truncate">
               <ShieldCheck className="w-3.5 h-3.5 text-[#0B0B0C] shrink-0" />
               <span className="truncate">
-                {isOfflineMode ? 'Offline Index' : `${sources.length} Sources`}
+                {isOfflineMode ? 'Offline' : `${sources.length} Sources`}
               </span>
             </div>
           </div>
@@ -253,7 +251,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                     Ask The Truth About Love
                   </h4>
                   <p className="text-xs text-[#5F6368] leading-relaxed max-w-xs mx-auto font-sans">
-                    Explore the five dimensions of love, unprogrammable sovereignty, syntropy, and vetted archival research.
+                    Explore the five dimensions of love and the interactive archive.
                   </p>
                 </div>
 

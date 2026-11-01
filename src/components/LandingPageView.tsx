@@ -37,32 +37,32 @@ const CURATED_MANUSCRIPT_TRUTHS: TruthQuoteItem[] = [
   },
   {
     id: 'truth-2',
-    quote: 'Love never wounds. What wounds is the distortion of power—control disguised as care.',
+    quote: 'Love never wounds. What wounds is a distortion of love.',
     contextLabel: 'Chapter 1 · The Nature of Love',
   },
   {
     id: 'truth-3',
-    quote: 'By 2030, inner life and love will collide with a changed collective reality, one where AI-generated thought takes more room than your truth.',
-    contextLabel: 'The 2030 Horizon · Fierce Lovers Manifesto',
+    quote: 'When we offload thinking to AI, we become lazier lovers, not fiercer ones.',
+    contextLabel: 'The Lovers Manifesto',
   },
   {
     id: 'truth-4',
-    quote: 'True love of self is not an app to install or a 30-day program. It is an unprogrammable state of being you were born with.',
-    contextLabel: 'Chapter 3 · Unprogrammable Self-Love',
+    quote: 'True love of self cannot be programmed. It is an inborn state of being.',
+    contextLabel: 'Chapter 3 · Unprogrammable self-love',
   },
   {
     id: 'truth-5',
-    quote: 'The answer to unequal power in love is not cold detachment—it is relational sovereignty: power shared within love, never power over another.',
-    contextLabel: 'Chapter 4 · Relational Sovereignty',
+    quote: 'The answer to power dynamics in love is self-regulation. Is is mastery of self, never power over another.',
+    contextLabel: 'Chapter 4 · The Love of Another',
   },
   {
     id: 'truth-6',
-    quote: 'Love expands the adjacent possible. It replaces a psychological blanket of fear with the courage to cross into a larger existence.',
+    quote: 'Love expands the adjacent possible. You expand into a much larger life and love it!',
     contextLabel: 'Chapter 2 · The Purpose of Love',
   },
   {
     id: 'truth-7',
-    quote: 'Love of life cannot rest on comfort or stoic endurance. It rests on our capacity to meet unpredictable change as an expanding victory.',
+    quote: 'The love of life cannot rest on zen nor stoicism. It never rests, like syntropy, it expands. Always',
     contextLabel: 'Chapter 5 · The Love of Life',
   },
 ];
@@ -153,7 +153,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   const currentTruth = carouselQuotes[activeQuoteIndex % carouselQuotes.length] || CURATED_MANUSCRIPT_TRUTHS[0];
 
   const handleWhyShouldICare = async (quoteText: string) => {
-    const formattedPrompt = `"${quoteText}" Why should I care?`;
+    const formattedPrompt = `"${quoteText}"Chat with Manuscript`;
     setQuickQuery(formattedPrompt);
     const archiveSection = document.getElementById('conversational-archive');
     if (archiveSection) {
@@ -247,40 +247,28 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
   const guidedPrompts = [
     {
-      category: 'First Principle',
       title: 'Love as a Fundamental Life Force',
       prompt: 'Why is love a fundamental life force rather than an emotion, and how does it expand the adjacent possible?',
-      description: 'Explore Stuart Kauffman’s adjacent possible, syntropy, and why reducing love to fleeting feelings diminishes your power.',
     },
     {
-      category: 'Chapter 3 · Self-Love',
       title: 'Unprogrammable Self-Love vs. Market Traps',
-      prompt: 'Why is authentic self-love unprogrammable, and how do algorithms and the wellness market capture our instinct for expansion?',
-      description: 'Uncover how self-knowledge and inner regulation restore generative self-love without 30-day consumer scripts.',
+      prompt: 'Why is authentic self-love unprogrammable, and how do algorithms and the wellness market capture our instinct for expansion?'
     },
     {
-      category: 'Chapter 4 · Romantic Love',
       title: 'Eros & Relational Sovereignty',
       prompt: 'When my patterns and needs collide with another person in romantic love, what is needed instead of detachment or attachment theory labels?',
-      description: 'Examine archetypal Eros, relational friction, and how two sovereign inner lives expand together.',
     },
     {
-      category: '2030 Horizon',
       title: 'The Collision with Synthetic AI Lovers',
       prompt: 'What is the 2030 collision between AI-generated thought, synthetic AI companions, and our authentic inner life?',
-      description: 'Understand how programmatic emotional regulation reshapes human intimacy—and how fierce lovers protect their truth.',
     },
     {
-      category: 'Chapters 5 & 6 · Life & Humanity',
       title: 'Meeting Unpredictable Change & Leaving Power Games',
       prompt: 'How do we love life as unpredictable change and love humanity beyond social dominance and performative goodness?',
-      description: 'Move past stoic survival and collective labels into an expansive victory over fear and control.',
     },
     {
-      category: 'Interactive Practice',
       title: 'Personal Love Intelligence & Standards Exercise',
       prompt: 'Guide me through a practical reflection exercise from the manuscript to evaluate my current love standards and reclaim emotional liberty.',
-      description: 'Start a personalized, step-by-step dialogue to clarify your standards and dissolve distortions in your own life.',
     },
   ];
 
@@ -371,7 +359,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 onClick={() => handleWhyShouldICare(currentTruth.quote)}
                 className="px-8 py-4 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white font-sans font-medium text-sm transition-all inline-flex items-center gap-3 cursor-pointer group"
               >
-                <span>Why should I care?</span>
+                <span>Ask Manuscript</span>
                 <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
               </button>
             </div>
@@ -400,7 +388,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   Talk with The Truth About Love book
                 </h2>
                 <p className="text-sm sm:text-base text-[#5F6368] leading-relaxed pt-1 font-sans">
-                  Chat with the manuscript. Every response is grounded in Catalina Butnaru&apos;s manuscript, author notes, curated literature, and research.
+                  Chat with the manuscript. Every response is grounded in the author's manuscript, author notes, research literature and research.
                 </p>
               </div>
 
@@ -417,7 +405,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                     }`}
                     title="Fast (gemini-3.1-flash-lite)"
                   >
-                    Fast Lite
+                    Fast
                   </button>
                   <button
                     type="button"
@@ -429,7 +417,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                     }`}
                     title="Balanced (gemini-3.8-flash)"
                   >
-                    Balanced Flash
+                    Balanced
                   </button>
                   <button
                     type="button"
@@ -439,7 +427,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                         ? 'bg-[#FF2A6D] text-white font-medium'
                         : 'text-[#5F6368] hover:text-[#0B0B0C]'
                     }`}
-                    title="Deep philosophical reasoning (gemini-4-argon)"
+                    title="Deep reasoning (gemini-4-argon)"
                   >
                     Deep Reasoning
                   </button>
@@ -490,13 +478,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-5 mt-3">
                 <div className="flex items-center gap-2.5 text-xs text-[#5F6368] flex-wrap font-sans">
-                  <span className="inline-flex items-center gap-2 font-medium text-[#202124]">
-                    <ShieldCheck className="w-4 h-4 text-[#0B0B0C]" />
-                    {isOfflineMode
-                      ? '100% privacy when offline'
-                      : 'Explore Catalina’s manuscript, research, and citations'}
-                  </span>
-                  <span className="hidden md:inline text-[#BDC1C6]">·</span>
                   <span className="hidden md:inline text-[#5F6368]">
                     Press <kbd className="font-mono px-1.5 py-0.5 rounded bg-[#F1F3F4] text-[#202124] text-[11px]">Enter</kbd> to ask, <kbd className="font-mono px-1.5 py-0.5 rounded bg-[#F1F3F4] text-[#202124] text-[11px]">Shift+Enter</kbd> for new line
                   </span>
@@ -567,10 +548,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3">
                   <div className="space-y-2">
                     <h3 className="text-lg sm:text-xl font-display font-normal text-[#0B0B0C]">
-                      Explore Guided Manuscript Dialogues
+                      Manuscript Prompts
                     </h3>
                     <p className="text-xs sm:text-sm text-[#5F6368] leading-relaxed font-sans">
-                      Select any theme below to launch an in-depth conversation grounded in that chapter, or load it into the prompt box to personalize your question.
+                      Start with a prompt below to launch the live chat with the Manuscript.
                     </p>
                   </div>
                 </div>
@@ -600,18 +581,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                       <div className="flex items-center justify-between gap-3 pt-3">
                         <button
                           type="button"
-                          onClick={() => {
-                            setQuickQuery(item.prompt);
-                            const el = document.getElementById('manuscript-composer');
-                            if (el) el.focus();
-                          }}
-                          className="text-xs font-medium text-[#5F6368] hover:text-[#0B0B0C] px-3 py-2 rounded-full hover:bg-[#E8EAED] transition-colors cursor-pointer"
-                        >
-                          Customize Prompt
-                        </button>
-
-                        <button
-                          type="button"
                           disabled={isChatLoading}
                           onClick={async () => {
                             setQuickQuery('');
@@ -632,11 +601,11 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 <div className="flex items-center justify-between flex-wrap gap-3 text-xs text-[#5F6368]">
                   <div className="flex items-center gap-3">
                     <span className="font-medium text-sm text-[#0B0B0C] font-display">
-                      Live Manuscript Dialogue ({messages.length} {messages.length === 1 ? 'exchange' : 'exchanges'})
+                      Chat with Manuscript ({messages.length} {messages.length === 1 ? 'exchange' : 'exchanges'})
                     </span>
                     <span>·</span>
                     <span className="text-[#5F6368] font-sans">
-                      Click any cited source badge to inspect the original passage
+                      Click to inspect a note
                     </span>
                   </div>
                   {onClearChat && (
@@ -669,7 +638,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                           <div className="flex items-center justify-between gap-3 mb-4 pb-3 text-xs text-[#5F6368]">
                             <div className="flex items-center gap-2.5 font-mono font-medium text-[#0B0B0C]">
                               <Sparkles className="w-4 h-4 text-[#0B0B0C]" />
-                              <span>Grounded Manuscript Synthesis · Catalina&apos;s Voice</span>
+                              <span>Manuscript voiceover</span>
                             </div>
                             <span className="text-[11px] font-mono tabular-nums text-[#80868B]">
                               {new Date(message.timestamp).toLocaleTimeString([], {
@@ -724,17 +693,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                                     ? 'bg-[#FF2A6D] text-white animate-pulse'
                                     : 'bg-[#FF2A6D] text-white hover:bg-[#E61556]'
                                 }`}
-                                title="Listen in Catalina's Voice"
+                                title="Listen"
                               >
                                 {speakingMessageId === message.id ? (
                                   <>
                                     <VolumeX className="w-3.5 h-3.5" />
-                                    <span>Stop Author Voice</span>
+                                    <span>Stop</span>
                                   </>
                                 ) : (
                                   <>
                                     <Volume2 className="w-3.5 h-3.5" />
-                                    <span>Read Aloud in Catalina&apos;s Voice</span>
+                                    <span>Read aloud</span>
                                   </>
                                 )}
                               </button>
@@ -869,7 +838,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
             {/* Right Flat-Positioned Published Hardcover Book on Invisible Surface */}
             <div className="lg:col-span-5 flex justify-center py-6">
-              <div className="relative real-published-book flex items-center justify-center w-full max-w-[430px] min-h-[500px] p-8 sm:p-10">
+              <div className="relative real-published-book bg-[#FFFFFF] flex items-center justify-center w-full max-w-[430px] min-h-[500px] p-8 sm:p-10">
                 {/* Flat-Positioned Physical Hardcover Book on Invisible Surface */}
                 <div className="published-book-flat relative z-10 w-[280px] sm:w-[316px] aspect-[1414/2000] select-none">
                   {/* Back Hardcover Board & Invisible-Surface Contact Shadow */}
@@ -964,38 +933,38 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             {
               title: 'The Love of Self',
               subtitle: 'Unprogrammable Self-love',
-              desc: "Self-love is not a 30-day program, it is inborn. It's closer to syntropy, and syntropy is achieved through self-knowledge and regulation. Our instinct for self-love and expansion is captured by market forces and algorithm-curated feeds, leaving us drained and disconnected from authentic love. Learn to love yourself better.",
+              desc: "Self-love is not a 30-day program, it is an inborn drive towards joyful expansion. Like syntropy. It is achieved through self mastery and regulation.",
               tag: 'Chapter 3',
             },
             {
               title: 'The Love of Another',
-              subtitle: 'Expand Through Loving Another',
-              desc: "Romantic love surges from an archetypal energy–the Eros. It is expansive and empowering. But, when your Self content, patterns, and needs collide with Anothers, it creates friction. To have a better love life, you don't need to detach or learn attachment theories. Learn what's needed.",
+              subtitle: 'Expand By Loving Another',
+              desc: "Romantic love surges from an powerful archetypal force, Eros. It provides the energy to expand and grow with another human being, become exquisitly thrilling to both.",
               tag: 'Chapter 4',
             },
             {
               title: 'The Love of Life',
               subtitle: 'Expansion Through Change',
-              desc: 'Love of life is not conditional on comfort or stoic survival. Life is unpredictable change. Loving life is meeting change as an expanding victory.',
+              desc: 'Love of life cannot thrive on comfort and survival, it asks that you expand who you are and emerge victorious from whatever life throws at you. It is the victory of the Self over death and decay.',
               tag: 'Chapter 5',
             },
             {
               title: 'The Love of Humanity',
               subtitle: 'Beyond Power Games',
-              desc: 'Not performing moral goodness. Loving all ways of being human. Freeing ourselves from the laws of social dominance and collective labels.',
+              desc: 'On loving all ways of being human and freeing ourselves from the laws of social dominance and collective labels.',
               tag: 'Chapter 6',
             },
             {
               title: 'The Love of the Divine',
               subtitle: 'Expand Into Oneness',
-              desc: 'Gathering all loves into one experience. Love is the unifying field through which all life moves. Explore love through the lens of mystics, spirituality, and philosophy without collapsing into AI-induced psychosis.',
+              desc: 'Gathering all loves into One Love. Explore love through the lens of mystics, spirituality, and philosophy without collapsing into AI-induced psychosis.',
               tag: 'Chapter 7',
               isFeatured: false,
             },
             {
               title: 'Practical exercises',
               subtitle: 'Explore the truth of your love life',
-              desc: 'Develop your love intelligence, learn how to detach from on emotional AI and reclaim emotional liberty, and define your love standards.',
+              desc: 'Develop your love intelligence and discover your love standards.',
               tag: 'Practice',
               isFeatured: true,
             },
@@ -1088,20 +1057,16 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
         </div>
       </section>
 
-      {/* Manuscript Archive & Citations Section */}
+      {/*Interactive Archive*/}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-24">
         <div className="p-10 sm:p-14 rounded-3xl bg-[#F8F9FA] space-y-10">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
             <div className="space-y-4 max-w-2xl">
-              <span className="text-xs font-mono font-medium text-[#5F6368] uppercase tracking-widest flex items-center gap-2.5 pb-1">
-                <Archive className="w-4 h-4 text-[#0B0B0C]" />
-                MANUSCRIPT ARCHIVE &amp; CITATIONS
-              </span>
               <h2 className="text-2xl sm:text-3xl font-display font-normal text-[#0B0B0C]">
-                Curated Reference Archive
+                Interactive Archive
               </h2>
               <p className="text-xs sm:text-sm text-[#5F6368] leading-relaxed pt-1 font-sans">
-                Manuscript chapters, autobiographical notes, hand-written notes, reference literature and research citations with attribution and recognitions live on the separate Manuscript Archive &amp; Citations Page. Explore at your leisure. Original documents are protected to respect intellectual property.
+                Manuscript chapters, author notes, reference literature and citations live on the separate Interactive Archive. Explore at your leisure. Original documents are protected to respect intellectual property.
               </p>
             </div>
 
@@ -1110,7 +1075,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               className="px-7 py-4 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white font-sans font-medium text-sm transition-all flex items-center gap-2.5 shrink-0 self-start md:self-auto cursor-pointer"
             >
               <Archive className="w-4 h-4" />
-              <span>Explore Manuscript Archive &amp; Citations ({sources.length})</span>
+              <span>Explore ({sources.length})</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </div>
@@ -1120,12 +1085,12 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             {[
               {
                 label: 'Authored by Catalina',
-                sublabel: 'Book chapters, Substack articles & authored works',
+                sublabel: 'Book chapters, Substack & author notes',
                 count: sources.filter((s) => getSourceSection(s) === 'authored').length,
               },
               {
                 label: 'Literature, References and Quotations',
-                sublabel: 'Compressed citation index, books & quotations',
+                sublabel: 'Explore the archive',
                 count: sources.filter((s) => getSourceSection(s) === 'references').length,
               },
             ].map((cat, i) => (
@@ -1145,20 +1110,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 </span>
               </button>
             ))}
-          </div>
-
-          <div className="pt-4 flex items-center justify-between text-xs text-[#5F6368]">
-            <div className="flex items-center gap-2.5 font-sans">
-              <ShieldCheck className="w-4 h-4 text-[#0B0B0C]" />
-              <span>Zero-cloud leakage: all text chunks indexed in local vector embeddings</span>
-            </div>
-            <button
-              onClick={onOpenArchive}
-              className="px-4 py-2 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white font-sans font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-            >
-              <span>View full archive catalog</span>
-              <ChevronRight className="w-3.5 h-3.5" />
-            </button>
           </div>
         </div>
       </section>

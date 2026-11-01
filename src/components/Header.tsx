@@ -80,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({
               </span>
             </div>
             <p className="text-xs text-[#5F6368] truncate max-w-xs font-sans">
-              Catalina Butnaru · Interactive Manuscript
+              Catalina Butnaru · Reclaim your power through love
             </p>
           </div>
         </div>
@@ -111,19 +111,9 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
           >
             <Archive className="w-3.5 h-3.5 text-current" />
-            <span>Manuscript Archive &amp; Citations</span>
+            <span>Interactive Archive</span>
           </button>
 
-          {onOpenChatPopup && (
-            <button
-              onClick={onOpenChatPopup}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-semibold text-white bg-[#FF2A6D] hover:bg-[#E61556] transition-all whitespace-nowrap cursor-pointer"
-              title="Open Multi-Turn Conversational Manuscript"
-            >
-              <MessageSquare className="w-3.5 h-3.5 text-white" />
-              <span>Ask Manuscript</span>
-            </button>
-          )}
         </div>
 
         {/* Action controls & Privacy mode */}
@@ -176,13 +166,13 @@ export const Header: React.FC<HeaderProps> = ({
                 ? 'bg-[#FF2A6D] text-white'
                 : 'bg-[#F1F3F4] text-[#202124] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
-            title="Search private vector embeddings directly"
+            title="Search the archive"
           >
             <Search className="w-3.5 h-3.5 text-current" />
-            <span className="hidden lg:inline">Vector Search</span>
+            <span className="hidden lg:inline">Search</span>
           </button>
 
-          {/* Privacy & Offline toggle */}
+          {/* Privacy */}
           <button
             onClick={() => setIsOfflineMode(!isOfflineMode)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
@@ -192,8 +182,8 @@ export const Header: React.FC<HeaderProps> = ({
             }`}
             title={
               isOfflineMode
-                ? 'Offline Privacy Active: Queries stay in local browser vector index'
-                : 'Hybrid Mode: Grounded Gemini answers with retrieved local passages'
+                ? 'Offline Privacy Active: Chats stay private in local browser.'
+                : 'Hybrid Mode: Gemini answers with locally available passages.'
             }
           >
             {isOfflineMode ? (
@@ -204,7 +194,7 @@ export const Header: React.FC<HeaderProps> = ({
             ) : (
               <>
                 <Database className="w-3.5 h-3.5 text-[#5F6368]" />
-                <span className="hidden sm:inline">Local Index + AI</span>
+                <span className="hidden sm:inline">Local Search</span>
               </>
             )}
           </button>
