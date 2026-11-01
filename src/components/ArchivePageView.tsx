@@ -320,15 +320,6 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-              <button
-                onClick={handleExportBibliography}
-                className="px-4 py-2.5 rounded-full bg-[#F1F3F4] text-[#0B0B0C] text-xs font-medium hover:bg-[#E8EAED] transition-colors flex items-center gap-1.5 cursor-pointer"
-                title="Download full bibliography in Markdown"
-              >
-                <Download className="w-4 h-4 text-[#0B0B0C]" />
-                <span>Export Bibliography</span>
-              </button>
-
               {isStudioAdmin && onPublishToPublic && (
                 <button
                   type="button"

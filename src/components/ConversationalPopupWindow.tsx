@@ -216,19 +216,19 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                   >
                     {message.role === 'assistant' && (
                       <div className="flex items-center justify-between gap-2 mb-2 pb-2 text-[10px] text-[#5F6368]">
-                        <div className="flex items-center gap-1.5 font-mono font-medium text-[#0B0B0C]">
+                        <div className="flex items-center gap-2 font-mono font-medium text-[#0B0B0C]">
+                          <div className="w-6 h-6 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
+                            <Heart className="w-3 h-3 text-white fill-white" />
+                          </div>
                           {message.guardrailCategory && message.guardrailCategory !== 'safe' ? (
                             <>
                               <ShieldCheck className="w-3 h-3 text-[#C83E0B]" />
                               <span>Safety Guardrail Notice</span>
                             </>
                           ) : (
-                            <>
-                              <Sparkles className="w-3 h-3" />
-                              <span>
-                                Catalina&apos;s Synthesis · {message.model || chatModel}
-                              </span>
-                            </>
+                            <span>
+                              Catalina&apos;s Synthesis · {message.model || chatModel}
+                            </span>
                           )}
                         </div>
                         <span className="font-mono tabular-nums">
@@ -290,8 +290,10 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
             )}
 
             {isChatLoading && (
-              <div className="flex items-center gap-2 p-3 rounded-2xl bg-[#FFFFFF] text-xs text-[#0B0B0C] max-w-[80%]">
-                <Sparkles className="w-3.5 h-3.5 text-[#0B0B0C] animate-spin shrink-0" />
+              <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-[#FFFFFF] text-xs text-[#0B0B0C] max-w-[80%]">
+                <div className="w-6 h-6 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
+                  <Heart className="w-3 h-3 text-white fill-white animate-pulse" />
+                </div>
                 <span>Catalina is contemplating your question...</span>
               </div>
             )}

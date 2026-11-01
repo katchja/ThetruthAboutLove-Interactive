@@ -11,7 +11,8 @@ import {
   Check,
   RotateCcw,
   MessageSquare,
-  ShieldCheck
+  ShieldCheck,
+  Heart
 } from 'lucide-react';
 import { BookMetadata, Source, ChatMessage, Citation, ChatModelTier, getSourceSection } from '../types';
 import { LabsFlowerShape, LabsCloudShape, Labs3DBlobShape } from './LabsFloatingShapes';
@@ -307,8 +308,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           <div className="bg-[#F1F3F4] px-8 sm:px-14 py-10 sm:py-14">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
               <div className="space-y-4 sm:space-y-5 max-w-2xl">
-                <div className="flex items-center gap-3.5 text-xs font-mono font-medium text-[#202124] pb-1">
-                  <MessageSquare className="w-4 h-4 text-[#0B0B0C]" />
+                <div className="flex items-center gap-3 text-xs font-mono font-medium text-[#202124] pb-1">
+                  <div className="w-7 h-7 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
+                    <Heart className="w-3.5 h-3.5 text-white fill-white" />
+                  </div>
                   <span className="tracking-wide uppercase">Conversational Manuscript</span>
                   <span className="text-[#80868B]">·</span>
                   <span className="text-[#5F6368] font-mono">
@@ -487,16 +490,16 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                         {message.role === 'assistant' && (
                           <div className="flex items-center justify-between gap-3 mb-4 pb-3 text-xs text-[#5F6368]">
                             <div className="flex items-center gap-2.5 font-mono font-medium text-[#0B0B0C] flex-wrap">
+                              <div className="w-7 h-7 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
+                                <Heart className="w-3.5 h-3.5 text-white fill-white" />
+                              </div>
                               {message.guardrailCategory && message.guardrailCategory !== 'safe' ? (
                                 <>
                                   <ShieldCheck className="w-4 h-4 text-[#C83E0B]" />
                                   <span>Conversational Safety Guardrail</span>
                                 </>
                               ) : (
-                                <>
-                                  <Sparkles className="w-4 h-4 text-[#0B0B0C]" />
-                                  <span>Manuscript Chat · {message.model || chatModel}</span>
-                                </>
+                                <span>Manuscript Chat · {message.model || chatModel}</span>
                               )}
                             </div>
                             <span className="text-[11px] font-mono tabular-nums text-[#80868B]">
@@ -585,7 +588,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                     <div className="flex items-start gap-3 animate-in fade-in">
                       <div className="max-w-lg rounded-2xl p-6 bg-[#FFFFFF] space-y-3">
                         <div className="flex items-center gap-2.5 text-sm text-[#0B0B0C] font-medium font-sans">
-                          <Sparkles className="w-4 h-4 animate-spin text-[#0B0B0C]" />
+                          <div className="w-7 h-7 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
+                            <Heart className="w-3.5 h-3.5 text-white fill-white animate-pulse" />
+                          </div>
                           <span>Searching manuscript and archive...</span>
                         </div>
                         <div className="space-y-2.5">
@@ -636,7 +641,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center gap-3.5 pt-2 text-xs font-mono text-[#5F6368]">
+              <div className="flex items-center gap-3 pt-2 text-xs font-mono text-[#5F6368]">
+                <div className="w-7 h-7 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
+                  <Heart className="w-3.5 h-3.5 text-white fill-white" />
+                </div>
                 <span>By <strong className="text-[#0B0B0C] font-medium">Catalina Butnaru</strong></span>
                 <span>·</span>
                 <span>Self-published interactive manuscript</span>

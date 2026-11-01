@@ -15,11 +15,11 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 const port = parseInt(process.env.PORT || '3000', 10);
+const isDevCommand = process.env.npm_lifecycle_event === 'dev';
 const isProd =
-  process.env.NODE_ENV === 'production' ||
-  process.env.npm_lifecycle_event === 'start' ||
-  Boolean(process.env.K_SERVICE) ||
-  Boolean(process.env.K_REVISION);
+  !isDevCommand &&
+  (process.env.NODE_ENV === 'production' ||
+    process.env.npm_lifecycle_event === 'start');
 
 // ============================================================================
 // 1. SECURITY HEADERS & SCOPED BODY PARSERS
@@ -1072,11 +1072,13 @@ app.all('/api/*', (req, res) => {
 async function startServer() {
   app.use('/assets', express.static(path.resolve(__dirname, 'public', 'assets')));
 
-  if (isProd) {
-    const distPath = path.resolve(__dirname, 'dist');
+  const distPath = path.resolve(__dirname, 'dist');
+  const distIndexHtml = path.resolve(distPath, 'index.html');
+
+  if (isProd && fs.existsSync(distIndexHtml)) {
     app.use(express.static(distPath));
     app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(distPath, 'index.html'));
+      res.sendFile(distIndexHtml);
     });
     server.listen(port, '0.0.0.0', () => {
       console.log(`FolioLM production server listening on http://0.0.0.0:${port}`);

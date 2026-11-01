@@ -3,7 +3,7 @@ import {
   ShieldCheck,
   X,
   Sparkles,
-  BookOpen,
+  Heart,
   Lock,
   HeartHandshake,
 } from 'lucide-react';
@@ -31,18 +31,23 @@ export const SafetyDisclosureModal: React.FC<SafetyDisclosureModalProps> = ({
       >
         {/* Header */}
         <div className="px-6 sm:px-8 py-6 bg-[#F8F9FA] flex items-start justify-between gap-4 shrink-0">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2 text-xs font-mono text-[#5F6368]">
-              <ShieldCheck className="w-4 h-4 text-[#C83E0B]" />
-              <span>Fair Disclosure</span>
-              <span aria-hidden="true">·</span>
-              <span>Conversational Safety</span>
-              <span aria-hidden="true">·</span>
-              <span>Gemini Flash-Lite</span>
+          <div className="flex items-start gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-[#0B0B0C] flex items-center justify-center shrink-0 mt-0.5">
+              <Heart className="w-5 h-5 text-white fill-white" />
             </div>
-            <h2 className="text-xl sm:text-2xl font-display font-medium text-[#0B0B0C]">
-              Safety, Fair Disclosure &amp; Reader Guardrails
-            </h2>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2 text-xs font-mono text-[#5F6368]">
+                <ShieldCheck className="w-4 h-4 text-[#C83E0B]" />
+                <span>Fair Disclosure</span>
+                <span aria-hidden="true">·</span>
+                <span>Conversational Safety</span>
+                <span aria-hidden="true">·</span>
+                <span>Gemini Flash-Lite</span>
+              </div>
+              <h2 className="text-xl sm:text-2xl font-display font-medium text-[#0B0B0C]">
+                Safety, Fair Disclosure &amp; Reader Guardrails
+              </h2>
+            </div>
           </div>
 
           <button
@@ -121,8 +126,10 @@ export const SafetyDisclosureModal: React.FC<SafetyDisclosureModalProps> = ({
 
         {/* Footer */}
         <div className="px-6 sm:px-8 py-4 bg-[#F8F9FA] flex items-center justify-between gap-4 shrink-0">
-          <div className="flex items-center gap-2 text-xs text-[#5F6368] font-mono">
-            <BookOpen className="w-3.5 h-3.5 text-[#0B0B0C]" />
+          <div className="flex items-center gap-2.5 text-xs text-[#5F6368] font-mono">
+            <div className="w-6 h-6 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
+              <Heart className="w-3 h-3 text-white fill-white" />
+            </div>
             <span>The Truth About Love · Catalina Butnaru</span>
           </div>
           <button
