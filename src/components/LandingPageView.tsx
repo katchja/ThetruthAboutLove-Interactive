@@ -73,8 +73,7 @@ interface LandingPageViewProps {
   onSendMessage: (query: string) => Promise<void>;
   isChatLoading: boolean;
   onClearChat?: () => void;
-  chatModel: ChatModelTier;
-  onChangeChatModel: (model: ChatModelTier) => void;
+  chatModel?: ChatModelTier;
   isOfflineMode: boolean;
   onOpenSafetyModal?: () => void;
 }
@@ -87,8 +86,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   onSendMessage,
   isChatLoading,
   onClearChat,
-  chatModel,
-  onChangeChatModel,
+  chatModel = 'gemini-3.1-flash-lite',
   onOpenSafetyModal,
 }) => {
   const [quickQuery, setQuickQuery] = useState('');
@@ -325,46 +323,11 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-4 self-start lg:self-center">
-                {/* Multi-turn Gemini Model Tier Selector */}
-                <div className="flex items-center gap-1.5 p-1.5 rounded-full bg-[#E8EAED] text-xs font-sans">
-                  <button
-                    type="button"
-                    onClick={() => onChangeChatModel('gemini-3.1-flash-lite')}
-                    className={`px-4 py-2 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-                      chatModel === 'gemini-3.1-flash-lite'
-                        ? 'bg-[#C83E0B] text-white font-medium'
-                        : 'text-[#5F6368] hover:text-[#0B0B0C]'
-                    }`}
-                    title="Fast (gemini-3.1-flash-lite)"
-                  >
-                    Fast
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onChangeChatModel('gemini-3.8-flash')}
-                    className={`px-4 py-2 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-                      chatModel === 'gemini-3.8-flash'
-                        ? 'bg-[#C83E0B] text-white font-medium'
-                        : 'text-[#5F6368] hover:text-[#0B0B0C]'
-                    }`}
-                    title="Balanced (gemini-3.8-flash)"
-                  >
-                    Balanced
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onChangeChatModel('gemini-4-argon')}
-                    className={`px-4 py-2 rounded-full transition-all whitespace-nowrap cursor-pointer ${
-                      chatModel === 'gemini-4-argon'
-                        ? 'bg-[#C83E0B] text-white font-medium'
-                        : 'text-[#5F6368] hover:text-[#0B0B0C]'
-                    }`}
-                    title="Deep reasoning (gemini-4-argon)"
-                  >
-                    Deep Reasoning
-                  </button>
-                </div>
+              <div className="flex flex-wrap items-center gap-3 self-start lg:self-center text-xs font-mono text-[#5F6368]">
+                <ShieldCheck className="w-4 h-4 text-[#C83E0B] shrink-0" />
+                <span className="text-[#0B0B0C] font-medium">Gemini Flash-Lite</span>
+                <span aria-hidden="true">·</span>
+                <span>Safeguarded Companion</span>
               </div>
             </div>
           </div>

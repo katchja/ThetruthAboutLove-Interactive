@@ -23,8 +23,7 @@ interface ConversationalPopupWindowProps {
   isOfflineMode: boolean;
   onSelectSource?: (source: Source) => void;
   sources: Source[];
-  chatModel: ChatModelTier;
-  onChangeChatModel: (model: ChatModelTier) => void;
+  chatModel?: ChatModelTier;
   onOpenSafetyModal?: () => void;
 }
 
@@ -38,8 +37,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
   isOfflineMode,
   onSelectSource,
   sources,
-  chatModel,
-  onChangeChatModel,
+  chatModel = 'gemini-3.1-flash-lite',
   onOpenSafetyModal,
 }) => {
   const [inputQuery, setInputQuery] = useState('');
@@ -150,45 +148,13 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
             </div>
           </div>
 
-          {/* Model Tier Selector & Subheader Status Bar */}
-          <div className="bg-[#F1F3F4] px-5 py-2.5 flex items-center justify-between gap-2 text-[11px] text-[#5F6368] shrink-0">
-            <div className="flex items-center gap-1 bg-[#E8EAED] p-1 rounded-full">
-              <button
-                type="button"
-                onClick={() => onChangeChatModel('gemini-3.1-flash-lite')}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors whitespace-nowrap cursor-pointer ${
-                  chatModel === 'gemini-3.1-flash-lite'
-                    ? 'bg-[#C83E0B] text-white'
-                    : 'text-[#5F6368] hover:text-[#0B0B0C]'
-                }`}
-                title="Fast responses"
-              >
-                Fast
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeChatModel('gemini-3.8-flash')}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors whitespace-nowrap cursor-pointer ${
-                  chatModel === 'gemini-3.8-flash'
-                    ? 'bg-[#C83E0B] text-white'
-                    : 'text-[#5F6368] hover:text-[#0B0B0C]'
-                }`}
-                title="General"
-              >
-                Balanced
-              </button>
-              <button
-                type="button"
-                onClick={() => onChangeChatModel('gemini-4-argon')}
-                className={`px-2.5 py-1 rounded-full text-[10px] font-medium transition-colors whitespace-nowrap cursor-pointer ${
-                  chatModel === 'gemini-4-argon'
-                    ? 'bg-[#C83E0B] text-white'
-                    : 'text-[#5F6368] hover:text-[#0B0B0C]'
-                }`}
-                title="Deep reasoning"
-              >
-                Deep Pro
-              </button>
+          {/* Subheader Status Bar (Locked to Free-Tier Gemini Flash-Lite) */}
+          <div className="bg-[#F1F3F4] px-5 py-2.5 flex items-center justify-between gap-2 text-[11px] font-mono text-[#5F6368] shrink-0">
+            <div className="flex items-center gap-1.5 truncate">
+              <Sparkles className="w-3.5 h-3.5 text-[#C83E0B] shrink-0" />
+              <span className="text-[#0B0B0C] font-medium">Gemini Flash-Lite</span>
+              <span aria-hidden="true">·</span>
+              <span>Safeguarded</span>
             </div>
 
             <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#5F6368] truncate">

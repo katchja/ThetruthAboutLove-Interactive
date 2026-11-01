@@ -1,0 +1,9 @@
+.aistudio/
+node_modules/
+.git/
+*.bak
+*.log
+coverage/
+.DS_Store
+.env*
+!.env.example

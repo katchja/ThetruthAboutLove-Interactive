@@ -1,6 +1,7 @@
 import express from 'express';
 import http from 'http';
 import fs from 'fs';
+import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -14,7 +15,11 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const server = http.createServer(app);
 const port = parseInt(process.env.PORT || '3000', 10);
-const isProd = process.env.NODE_ENV === 'production';
+const isProd =
+  process.env.NODE_ENV === 'production' ||
+  process.env.npm_lifecycle_event === 'start' ||
+  Boolean(process.env.K_SERVICE) ||
+  Boolean(process.env.K_REVISION);
 
 // ============================================================================
 // 1. SECURITY HEADERS & SCOPED BODY PARSERS
@@ -250,12 +255,8 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label = 'Gemini API'): 
   });
 }
 
-// Allowed multi-turn chat models
-const ALLOWED_CHAT_MODELS = new Set([
-  'gemini-3.1-flash-lite',
-  'gemini-3.8-flash',
-  'gemini-4-argon',
-]);
+// Strictly locked to free-tier Gemini Flash-Lite (gemini-3.1-flash-lite)
+const FREE_CHAT_MODEL = 'gemini-3.1-flash-lite';
 
 // ============================================================================
 // 5B. SERVER-SIDE CONVERSATIONAL GUARDRAIL & SANDBOX HELPERS
@@ -418,11 +419,8 @@ app.post('/api/chat', chatRateLimiter, async (req, res) => {
       return res.status(400).json({ error: 'A valid non-empty question is required.' });
     }
 
-    // Default to Gemini Flash-Lite (gemini-3.1-flash-lite) per confirmed configuration
-    const selectedModel =
-      typeof requestedModel === 'string' && ALLOWED_CHAT_MODELS.has(requestedModel)
-        ? requestedModel
-        : 'gemini-3.1-flash-lite';
+    // Locked exclusively to the free-tier Gemini Flash-Lite model with built-in safeguards
+    const selectedModel = FREE_CHAT_MODEL;
 
     // LAYER 1: Deterministic Pre-Flight Guardrail & Abuse Classification
     const guardrailCheck = evaluateQueryGuardrails(cleanQuery);
@@ -508,7 +506,7 @@ INTELLECTUAL PROPERTY, SCOPE & ANTI-INJECTION GUARDRAILS:
       ],
     });
 
-    const timeoutMs = selectedModel === 'gemini-4-argon' ? 25000 : 15000;
+    const timeoutMs = 15000;
 
     // LAYER 3: Gemini Execution with Explicit HarmCategory Safety Thresholds
     const response = await withTimeout(
@@ -669,8 +667,7 @@ Format your response as valid JSON with keys:
 // 8. PERSISTENT ARCHIVE & PICTURE STORE (Atomic Writes, Backup & Schema Validation)
 // ============================================================================
 const ARCHIVE_STORE_PATH = path.resolve(__dirname, 'archive-store.json');
-const ARCHIVE_STORE_BAK_PATH = path.resolve(__dirname, 'archive-store.json.bak');
-const PUBLIC_ARCHIVE_STORE_PATH = path.resolve(__dirname, 'public', 'archive-store.json');
+const CARDS_ASSETS_DIR = path.resolve(__dirname, 'public', 'assets', 'cards');
 
 interface PersistedArchiveStore {
   sources: any[];
@@ -681,19 +678,55 @@ interface PersistedArchiveStore {
 
 let cachedArchiveStore: PersistedArchiveStore | null = null;
 
+function persistDataImageToAsset(safeImg: string, sourceId = 'card', idx = 0): string {
+  if (!safeImg.startsWith('data:image/')) {
+    return safeImg;
+  }
+  const match = safeImg.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+  if (!match) {
+    return safeImg;
+  }
+  try {
+    let ext = match[1].toLowerCase();
+    if (ext === 'jpeg') ext = 'jpg';
+    if (ext === 'svg+xml') ext = 'svg';
+    const buf = Buffer.from(match[2], 'base64');
+    const hash = crypto.createHash('sha1').update(buf).digest('hex').slice(0, 10);
+    const safeId = String(sourceId || 'card').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48);
+    const filename = `${safeId}-${idx}-${hash}.${ext}`;
+    if (!fs.existsSync(CARDS_ASSETS_DIR)) {
+      fs.mkdirSync(CARDS_ASSETS_DIR, { recursive: true });
+    }
+    const targetPath = path.join(CARDS_ASSETS_DIR, filename);
+    if (!fs.existsSync(targetPath)) {
+      fs.writeFileSync(targetPath, buf);
+    }
+    return `/assets/cards/${filename}`;
+  } catch {
+    return safeImg;
+  }
+}
+
 function getNormalizedSourceImages(s: any): string[] {
   const list: string[] = [];
+  const sourceId = s?.id || 'card';
   if (s && Array.isArray(s.images)) {
-    for (const img of s.images) {
-      const safe = sanitizeImageSrc(img);
-      if (safe && !list.includes(safe)) {
-        list.push(safe);
+    for (let i = 0; i < s.images.length; i++) {
+      const safe = sanitizeImageSrc(s.images[i]);
+      if (safe) {
+        const persisted = persistDataImageToAsset(safe, sourceId, i);
+        if (!list.includes(persisted)) {
+          list.push(persisted);
+        }
       }
     }
   }
   const safePrimary = sanitizeImageSrc(s?.imageUrl);
-  if (safePrimary && !list.includes(safePrimary)) {
-    list.unshift(safePrimary);
+  if (safePrimary) {
+    const persistedPrimary = persistDataImageToAsset(safePrimary, sourceId, 0);
+    if (!list.includes(persistedPrimary)) {
+      list.unshift(persistedPrimary);
+    }
   }
   return list.slice(0, 24);
 }
@@ -817,16 +850,8 @@ function readArchiveStore(): PersistedArchiveStore {
   }
 
   const primary = readSingleStoreFile(ARCHIVE_STORE_PATH);
-  const pub = readSingleStoreFile(PUBLIC_ARCHIVE_STORE_PATH);
-  const backup = readSingleStoreFile(ARCHIVE_STORE_BAK_PATH);
-
-  const candidates = [primary, pub, backup].filter(
-    (c): c is PersistedArchiveStore => c !== null
-  );
-
-  if (candidates.length > 0) {
-    candidates.sort((a, b) => b.updatedAt - a.updatedAt);
-    cachedArchiveStore = candidates[0];
+  if (primary) {
+    cachedArchiveStore = primary;
     return cachedArchiveStore;
   }
 
@@ -838,22 +863,13 @@ function readArchiveStore(): PersistedArchiveStore {
   return cachedArchiveStore;
 }
 
-function writeAtomicJsonFile(targetPath: string, serialized: string, createBackup = false): void {
+function writeAtomicJsonFile(targetPath: string, serialized: string): void {
   const dir = path.dirname(targetPath);
   if (!fs.existsSync(dir)) {
     fs.mkdirSync(dir, { recursive: true });
   }
   const tmpPath = `${targetPath}.${process.pid}.${Date.now()}.tmp`;
   fs.writeFileSync(tmpPath, serialized, 'utf-8');
-
-  if (createBackup && fs.existsSync(targetPath)) {
-    try {
-      fs.copyFileSync(targetPath, ARCHIVE_STORE_BAK_PATH);
-    } catch (bakErr) {
-      console.warn('Could not update archive backup file:', bakErr);
-    }
-  }
-
   fs.renameSync(tmpPath, targetPath);
 }
 
@@ -863,15 +879,9 @@ function writeArchiveStore(store: PersistedArchiveStore): void {
   const serialized = JSON.stringify(store, null, 2);
 
   try {
-    writeAtomicJsonFile(ARCHIVE_STORE_PATH, serialized, true);
+    writeAtomicJsonFile(ARCHIVE_STORE_PATH, serialized);
   } catch (err) {
     console.error('Failed to write root archive-store.json:', err);
-  }
-
-  try {
-    writeAtomicJsonFile(PUBLIC_ARCHIVE_STORE_PATH, serialized, false);
-  } catch (err) {
-    console.error('Failed to write public/archive-store.json:', err);
   }
 }
 
@@ -1062,33 +1072,45 @@ app.all('/api/*', (req, res) => {
 async function startServer() {
   app.use('/assets', express.static(path.resolve(__dirname, 'public', 'assets')));
 
-  if (!isProd) {
-    process.env.DISABLE_HMR = 'true';
-    const { createServer: createViteServer } = await import('vite');
-    const vite = await createViteServer({
-      server: {
-        middlewareMode: true,
-        host: '0.0.0.0',
-        port: port,
-        hmr: false,
-        watch: {
-          ignored: [
-            '**/archive-store.json',
-            '**/archive-store.json.bak',
-            '**/public/archive-store.json',
-          ],
-        },
-      },
-      appType: 'spa',
+  if (isProd) {
+    const distPath = path.resolve(__dirname, 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (_req, res) => {
+      res.sendFile(path.resolve(distPath, 'index.html'));
     });
+    server.listen(port, '0.0.0.0', () => {
+      console.log(`FolioLM production server listening on http://0.0.0.0:${port}`);
+    });
+    return;
+  }
 
-    // Serve a WebSocket-free /@vite/client in dev mode (since HMR is disabled in AI Studio)
-    // so the browser never attempts a failing WebSocket connection or logs unhandled rejections.
-    app.use((req, res, next) => {
-      if (req.url && req.url.split('?')[0] === '/@vite/client') {
-        res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
-        res.setHeader('Cache-Control', 'no-store');
-        return res.end(`import "/node_modules/vite/dist/client/env.mjs";
+  // Dev mode: bind port immediately so health checks pass while Vite initializes
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`FolioLM dev server listening on http://0.0.0.0:${port}`);
+  });
+
+  process.env.DISABLE_HMR = 'true';
+  const { createServer: createViteServer } = await import('vite');
+  const vite = await createViteServer({
+    server: {
+      middlewareMode: true,
+      host: '0.0.0.0',
+      port: port,
+      hmr: false,
+      watch: {
+        ignored: ['**/archive-store.json', '**/public/archive-store.json'],
+      },
+    },
+    appType: 'spa',
+  });
+
+  // Serve a WebSocket-free /@vite/client in dev mode (since HMR is disabled in AI Studio)
+  // so the browser never attempts a failing WebSocket connection or logs unhandled rejections.
+  app.use((req, res, next) => {
+    if (req.url && req.url.split('?')[0] === '/@vite/client') {
+      res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+      res.setHeader('Cache-Control', 'no-store');
+      return res.end(`import "/node_modules/vite/dist/client/env.mjs";
 const sheetsMap = new Map();
 const linkSheetsMap = new Map();
 if ("document" in globalThis) {
@@ -1154,47 +1176,37 @@ export function injectQuery(url, queryToInject) {
 }
 export class ErrorOverlay {}
 `);
-      }
-      next();
-    });
+    }
+    next();
+  });
 
-    // When DISABLE_HMR=true disables file watching in vite.config.ts,
-    // ensure modified /src/ modules are invalidated on request so Vite never serves stale exports.
-    const fileMtimes = new Map<string, number>();
-    app.use((req, _res, next) => {
-      if (req.url && req.url.startsWith('/src/')) {
-        const cleanRelPath = req.url.split('?')[0].replace(/^\/+/, '');
-        const absFilePath = path.resolve(__dirname, cleanRelPath);
-        try {
-          if (fs.existsSync(absFilePath)) {
-            const mtime = fs.statSync(absFilePath).mtimeMs;
-            const prev = fileMtimes.get(absFilePath);
-            if (prev !== undefined && prev !== mtime) {
-              const mods = vite.moduleGraph.getModulesByFile(absFilePath);
-              if (mods) {
-                for (const mod of mods) {
-                  vite.moduleGraph.invalidateModule(mod);
-                }
+  // When DISABLE_HMR=true disables file watching in vite.config.ts,
+  // ensure modified /src/ modules are invalidated on request so Vite never serves stale exports.
+  const fileMtimes = new Map<string, number>();
+  app.use((req, _res, next) => {
+    if (req.url && req.url.startsWith('/src/')) {
+      const cleanRelPath = req.url.split('?')[0].replace(/^\/+/, '');
+      const absFilePath = path.resolve(__dirname, cleanRelPath);
+      try {
+        if (fs.existsSync(absFilePath)) {
+          const mtime = fs.statSync(absFilePath).mtimeMs;
+          const prev = fileMtimes.get(absFilePath);
+          if (prev !== undefined && prev !== mtime) {
+            const mods = vite.moduleGraph.getModulesByFile(absFilePath);
+            if (mods) {
+              for (const mod of mods) {
+                vite.moduleGraph.invalidateModule(mod);
               }
             }
-            fileMtimes.set(absFilePath, mtime);
           }
-        } catch {}
-      }
-      next();
-    });
-
-    app.use(vite.middlewares);
-  } else {
-    app.use(express.static(path.resolve(__dirname, 'dist')));
-    app.get('*', (_req, res) => {
-      res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
-    });
-  }
-
-  server.listen(port, '0.0.0.0', () => {
-    console.log(`FolioLM server listening on http://0.0.0.0:${port}`);
+          fileMtimes.set(absFilePath, mtime);
+        }
+      } catch {}
+    }
+    next();
   });
+
+  app.use(vite.middlewares);
 }
 
 startServer().catch((err) => {

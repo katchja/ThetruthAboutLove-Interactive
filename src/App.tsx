@@ -27,6 +27,7 @@ import { defaultBookMetadata, seedSources } from './data/seedData';
 import { evaluateQueryGuardrails } from './utils/chatGuardrails';
 import {
   indexSource,
+  indexSourcesBatch,
   loadArchiveFromDB,
   removeSourceFromDB,
   semanticSearch,
@@ -98,10 +99,10 @@ export default function App() {
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [isLoadingArchive, setIsLoadingArchive] = useState(true);
 
-  // Conversational Chat state (defaults to Gemini Flash-Lite per confirmed configuration)
+  // Conversational Chat state (locked exclusively to Gemini Flash-Lite)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [chatModel, setChatModel] = useState<ChatModelTier>('gemini-3.1-flash-lite');
+  const chatModel: ChatModelTier = 'gemini-3.1-flash-lite';
   const [isSemanticSearchOpen, setIsSemanticSearchOpen] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isChatPopupOpen, setIsChatPopupOpen] = useState(false);
@@ -478,8 +479,11 @@ export default function App() {
           }
         }
 
-        // If the author is in Google AI Studio Build mode, merge all pictures, edits, and citations from her browser IndexedDB
-        // and immediately publish them to the server so they are live on the public app!
+        // If the author is in Google AI Studio Build mode, merge any newer edits or newly created cards from her browser IndexedDB
+        let hasLocalUnsyncedChanges = localDeletedIds.some(
+          (id) => !serverDeletedIds.includes(id)
+        );
+
         if (isStudioBuildMode && stored.sources.length > 0) {
           for (const loc of stored.sources) {
             if (!loc || !loc.id || combinedDeleted.has(loc.id) || isPurgedArchiveSource(loc)) {
@@ -488,6 +492,7 @@ export default function App() {
             const current = byId.get(loc.id);
             const locImages = getSourceImages(loc);
             if (!current) {
+              hasLocalUnsyncedChanges = true;
               byId.set(loc.id, {
                 ...loc,
                 section: getSourceSection(loc),
@@ -496,18 +501,28 @@ export default function App() {
               });
             } else {
               const curImages = getSourceImages(current);
-              const combinedImages: string[] = [];
-              for (const img of [...locImages, ...curImages]) {
-                if (img && !combinedImages.includes(img)) {
-                  combinedImages.push(img);
-                }
-              }
-              const locTime = loc.updatedAt || (loc.createdAt > 1710000000000 ? loc.createdAt : 0);
-              const curTime = current.updatedAt || (current.createdAt > 1710000000000 ? current.createdAt : 0);
+              const serverHasStaticAsset = curImages.some((img) =>
+                img.startsWith('/assets/')
+              );
+              const locHasOnlyDataUrls =
+                locImages.length > 0 &&
+                locImages.every((img) => img.startsWith('data:'));
 
-              if (locTime >= curTime || locImages.length >= curImages.length) {
+              const locTime =
+                loc.updatedAt || (loc.createdAt > 1710000000000 ? loc.createdAt : 0);
+              const curTime =
+                current.updatedAt ||
+                (current.createdAt > 1710000000000 ? current.createdAt : 0);
+
+              if (locTime > curTime) {
+                hasLocalUnsyncedChanges = true;
                 const merged = { ...current, ...loc };
-                const imgsToUse = loc.updatedAt ? locImages : combinedImages;
+                const imgsToUse =
+                  serverHasStaticAsset && locHasOnlyDataUrls && locImages.length === curImages.length
+                    ? curImages
+                    : locImages.length > 0
+                    ? locImages
+                    : curImages;
                 byId.set(loc.id, {
                   ...merged,
                   section: getSourceSection(merged),
@@ -515,47 +530,40 @@ export default function App() {
                   images: imgsToUse.length > 0 ? imgsToUse : undefined,
                 });
               } else {
+                const imgsToUse = curImages.length > 0 ? curImages : locImages;
                 const merged = { ...loc, ...current };
                 byId.set(loc.id, {
                   ...merged,
                   section: getSourceSection(merged),
-                  imageUrl: combinedImages[0] || current.imageUrl || loc.imageUrl,
-                  images: combinedImages.length > 0 ? combinedImages : undefined,
+                  imageUrl: imgsToUse[0] || current.imageUrl || loc.imageUrl,
+                  images: imgsToUse.length > 0 ? imgsToUse : undefined,
                 });
               }
             }
           }
         }
 
-        const rawFinalSources = Array.from(byId.values());
-        const finalSources: Source[] = [];
-        for (const s of rawFinalSources) {
-          if (isStudioBuildMode) {
-            finalSources.push(await optimizeSourceForSync(s));
-          } else {
-            finalSources.push(s);
-          }
-        }
+        const finalSources = Array.from(byId.values());
 
-        // Index all canonical sources into local vector chunks
-        const allIndexedChunks: VectorChunk[] = [];
-        for (const s of finalSources) {
-          const chunks = await indexSource(s);
-          allIndexedChunks.push(...chunks);
-        }
+        // Index all canonical sources into local vector chunks in a single batch transaction
+        const allIndexedChunks = await indexSourcesBatch(finalSources);
 
         setSources(finalSources);
         setVectorChunks(allIndexedChunks);
         setSelectedSourceIds(finalSources.map((s) => s.id));
         setSyncedStats(computeLocalStats(finalSources));
 
-        // If in Google AI Studio Build mode, auto-publish the merged set to the backend server
+        // Only auto-publish on startup if local IndexedDB has unsynced edits or new sources
         if (isStudioBuildMode) {
-          await publishArchiveToPublic(
-            finalSources,
-            Array.from(combinedDeleted),
-            serverMetadata || bookMetadata
-          );
+          if (hasLocalUnsyncedChanges) {
+            await publishArchiveToPublic(
+              finalSources,
+              Array.from(combinedDeleted),
+              serverMetadata || bookMetadata
+            );
+          } else {
+            setSyncStatus('synced');
+          }
         }
       } catch (err) {
         console.warn('Archive initialization fallback:', err);
@@ -803,10 +811,7 @@ export default function App() {
       });
 
       const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        chatModel === 'gemini-4-argon' ? 26000 : 16000
-      );
+      const timeoutId = setTimeout(() => controller.abort(), 16000);
 
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -993,7 +998,6 @@ export default function App() {
           isChatLoading={isChatLoading}
           onClearChat={() => setMessages([])}
           chatModel={chatModel}
-          onChangeChatModel={setChatModel}
           isOfflineMode={isOfflineMode}
           onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
         />
@@ -1011,7 +1015,6 @@ export default function App() {
         onSelectSource={(s) => setActiveSourceDetail(s)}
         sources={sources}
         chatModel={chatModel}
-        onChangeChatModel={setChatModel}
         onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
       />
 

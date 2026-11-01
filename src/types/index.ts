@@ -4,10 +4,7 @@ export type SourceType = 'chapter' | 'article' | 'note' | 'scan' | 'citation' | 
 export type ArchiveSection = 'authored' | 'references';
 export type AppView = 'landing' | 'archive';
 
-export type ChatModelTier =
-  | 'gemini-3.1-flash-lite'
-  | 'gemini-3.8-flash'
-  | 'gemini-4-argon';
+export type ChatModelTier = 'gemini-3.1-flash-lite';
 
 export interface Source {
   id: string;

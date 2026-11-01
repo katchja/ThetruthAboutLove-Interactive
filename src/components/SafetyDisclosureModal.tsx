@@ -78,7 +78,7 @@ export const SafetyDisclosureModal: React.FC<SafetyDisclosureModalProps> = ({
               <h3>2. Transparent AI Disclosure (Gemini Flash-Lite)</h3>
             </div>
             <p className="text-xs sm:text-sm text-[#5F6368] leading-relaxed">
-              When you ask a question, your browser first searches a local 256-dimensional vector index of Catalina Butnaru&apos;s manuscript chapters, field notes, and bibliographic citations. The top matching excerpts are then synthesized by <strong>Google Gemini Flash-Lite (`gemini-3.1-flash-lite`)</strong> (or your selected reasoning tier).
+              When you ask a question, your browser first searches a local 256-dimensional vector index of Catalina Butnaru&apos;s manuscript chapters, field notes, and bibliographic citations. The top matching excerpts are then synthesized exclusively by the free-tier <strong>Google Gemini Flash-Lite (`gemini-3.1-flash-lite`)</strong> model with built-in conversational safeguards.
             </p>
             <p className="text-xs text-[#5F6368] leading-relaxed">
               Because AI language models generate probabilistic syntheses, responses may occasionally compress nuance. Always click the numbered citation links (e.g., <span className="font-mono text-[#0B0B0C]">[1]</span>, <span className="font-mono text-[#0B0B0C]">[2]</span>) to inspect the underlying archival card and bibliographic source directly.

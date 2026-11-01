@@ -1,6 +1,6 @@
 import { Source, VectorChunk, SearchResult, getSourceImages, getSourceSection } from '../types';
 
-const DB_NAME = 'TruthAboutLove_LocalArchive_v5';
+const DB_NAME = 'TruthAboutLove_LocalArchive_v6';
 const DB_VERSION = 1;
 const SOURCES_STORE = 'sources';
 const CHUNKS_STORE = 'vector_chunks';
@@ -161,25 +161,86 @@ function openDB(): Promise<IDBDatabase> {
   });
 }
 
+export function computeChunksForSource(source: Source): VectorChunk[] {
+  const fullTextToChunk = `${source.title}\n${source.summary}\n${source.content}`;
+  const textChunks = chunkText(fullTextToChunk);
+
+  return textChunks.map((chunkText, idx) => ({
+    id: `${source.id}_chunk_${idx}`,
+    sourceId: source.id,
+    sourceTitle: source.title,
+    sourceType: source.type,
+    reference: source.reference,
+    text: chunkText,
+    vector: generateLocalEmbedding(chunkText),
+    tokenCount: chunkText.split(/\s+/).length,
+  }));
+}
+
+/**
+ * Batch ingest and index multiple sources in a single IndexedDB transaction
+ */
+export async function indexSourcesBatch(sources: Source[]): Promise<VectorChunk[]> {
+  const allChunks: VectorChunk[] = [];
+  for (const s of sources) {
+    allChunks.push(...computeChunksForSource(s));
+  }
+
+  try {
+    const db = await openDB();
+    await new Promise<void>((resolve) => {
+      try {
+        const tx = db.transaction([SOURCES_STORE, CHUNKS_STORE], 'readwrite');
+        const sourceStore = tx.objectStore(SOURCES_STORE);
+        const chunkStore = tx.objectStore(CHUNKS_STORE);
+
+        sourceStore.clear();
+        chunkStore.clear();
+
+        for (const s of sources) {
+          sourceStore.put(s);
+        }
+        for (const chunk of allChunks) {
+          chunkStore.put(chunk);
+        }
+
+        tx.oncomplete = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve();
+        };
+        tx.onerror = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve();
+        };
+        tx.onabort = () => {
+          try {
+            db.close();
+          } catch {}
+          resolve();
+        };
+      } catch {
+        try {
+          db.close();
+        } catch {}
+        resolve();
+      }
+    });
+  } catch (err) {
+    console.warn('Batch IndexedDB save fallback:', err);
+  }
+
+  return allChunks;
+}
+
 /**
  * Ingest and index (or re-index on edit) a Source into local vector store
  */
 export async function indexSource(source: Source): Promise<VectorChunk[]> {
-  const fullTextToChunk = `${source.title}\n${source.summary}\n${source.content}`;
-  const textChunks = chunkText(fullTextToChunk);
-
-  const chunks: VectorChunk[] = textChunks.map((chunkText, idx) => {
-    return {
-      id: `${source.id}_chunk_${idx}`,
-      sourceId: source.id,
-      sourceTitle: source.title,
-      sourceType: source.type,
-      reference: source.reference,
-      text: chunkText,
-      vector: generateLocalEmbedding(chunkText),
-      tokenCount: chunkText.split(/\s+/).length,
-    };
-  });
+  const chunks = computeChunksForSource(source);
 
   try {
     const db = await openDB();
@@ -352,6 +413,7 @@ export function isPurgedArchiveSource(source: Partial<Source>): boolean {
 }
 
 const LEGACY_DB_NAMES = [
+  'TruthAboutLove_LocalArchive_v5',
   'TruthAboutLove_LocalArchive_v4',
   'TruthAboutLove_LocalArchive_v3',
   'TruthAboutLove_LocalArchive_v2',
@@ -359,76 +421,26 @@ const LEGACY_DB_NAMES = [
   'TruthAboutLove_LocalArchive',
 ];
 
-function readLegacySourcesFromDBName(dbName: string): Promise<Source[]> {
-  return new Promise((resolve) => {
-    try {
-      const req = indexedDB.open(dbName);
-      req.onsuccess = () => {
-        const db = req.result;
-        if (!db.objectStoreNames.contains(SOURCES_STORE)) {
-          db.close();
-          resolve([]);
-          return;
-        }
-        try {
-          const tx = db.transaction([SOURCES_STORE], 'readonly');
-          const store = tx.objectStore(SOURCES_STORE);
-          const getAllReq = store.getAll();
-          getAllReq.onsuccess = () => {
-            const list = Array.isArray(getAllReq.result) ? getAllReq.result : [];
-            db.close();
-            resolve(list);
-          };
-          getAllReq.onerror = () => {
-            db.close();
-            resolve([]);
-          };
-        } catch {
-          db.close();
-          resolve([]);
-        }
-      };
-      req.onerror = () => resolve([]);
-    } catch {
-      resolve([]);
-    }
-  });
-}
+let legacyPurgeScheduled = false;
 
-async function recoverLegacyIndexedDBSources(): Promise<Source[]> {
-  if (typeof indexedDB === 'undefined') return [];
-  const recovered: Source[] = [];
-  try {
-    let existingDbNames = new Set<string>(LEGACY_DB_NAMES);
-    if (typeof indexedDB.databases === 'function') {
-      const dbs = await indexedDB.databases();
-      const actualNames = new Set(
-        dbs.map((d) => d.name).filter((n): n is string => Boolean(n))
-      );
-      existingDbNames = new Set(
-        LEGACY_DB_NAMES.filter((name) => actualNames.has(name))
-      );
+function purgeLegacyIndexedDBs(): void {
+  if (legacyPurgeScheduled || typeof indexedDB === 'undefined') return;
+  legacyPurgeScheduled = true;
+  setTimeout(() => {
+    for (const legacyName of LEGACY_DB_NAMES) {
+      try {
+        indexedDB.deleteDatabase(legacyName);
+      } catch {}
     }
-
-    for (const legacyName of existingDbNames) {
-      const items = await readLegacySourcesFromDBName(legacyName);
-      for (const item of items) {
-        if (item && item.id) {
-          recovered.push(item);
-        }
-      }
-    }
-  } catch {
-    // Ignore errors on browsers that restrict indexedDB.databases()
-  }
-  return recovered;
+  }, 50);
 }
 
 /**
- * Load all stored sources and chunks from IndexedDB, automatically recovering
- * any legacy citations/photos and purging removed items
+ * Load all stored sources and chunks from IndexedDB, purging legacy base64 caches
+ * and removed items
  */
 export async function loadArchiveFromDB(): Promise<{ sources: Source[]; chunks: VectorChunk[] }> {
+  purgeLegacyIndexedDBs();
   try {
     const db = await openDB();
     const raw = await new Promise<{ sources: Source[]; chunks: VectorChunk[] }>((resolve) => {
@@ -473,72 +485,18 @@ export async function loadArchiveFromDB(): Promise<{ sources: Source[]; chunks: 
     const purgedIds = new Set<string>(deletedSet);
     const byId = new Map<string, Source>();
 
-    const mergeStoredSources = (older: Source, newer: Source): Source => {
-      const olderImgs = getSourceImages(older);
-      const newerImgs = getSourceImages(newer);
-      const combinedImgs: string[] = [];
-      for (const img of [...newerImgs, ...olderImgs]) {
-        if (img && !combinedImgs.includes(img)) {
-          combinedImgs.push(img);
-        }
-      }
-
-      const olderModified = older.updatedAt || (older.createdAt > 1710000000000 ? older.createdAt : 0);
-      const newerModified = newer.updatedAt || (newer.createdAt > 1710000000000 ? newer.createdAt : 0);
-      const preferOlder =
-        olderModified > newerModified ||
-        (olderImgs.some((i) => i.startsWith('data:image/')) &&
-          !newerImgs.some((i) => i.startsWith('data:image/')) &&
-          !newer.updatedAt);
-
-      const base = preferOlder ? { ...newer, ...older } : { ...older, ...newer };
-      const finalImages = newer.updatedAt ? newerImgs : combinedImgs;
-
-      return {
-        ...base,
-        section: getSourceSection(base),
-        imageUrl: finalImages[0] || base.imageUrl,
-        images: finalImages.length > 0 ? finalImages : undefined,
-      };
-    };
-
-    // 1. First load any legacy DB sources so v5 overrides or enriches them
-    const legacySources = await recoverLegacyIndexedDBSources();
-    for (const leg of legacySources) {
-      if (!leg || !leg.id || isPurgedArchiveSource(leg) || deletedSet.has(leg.id)) {
-        continue;
-      }
-      if (!byId.has(leg.id)) {
-        const imgs = getSourceImages(leg);
-        byId.set(leg.id, {
-          ...leg,
-          section: getSourceSection(leg),
-          imageUrl: imgs[0] || leg.imageUrl,
-          images: imgs.length > 0 ? imgs : undefined,
-        });
-      } else {
-        byId.set(leg.id, mergeStoredSources(byId.get(leg.id)!, leg));
-      }
-    }
-
-    // 2. Merge current v5 sources on top
     for (const source of raw.sources) {
       if (isPurgedArchiveSource(source) || deletedSet.has(source.id)) {
         purgedIds.add(source.id);
         byId.delete(source.id);
       } else {
-        const prev = byId.get(source.id);
-        if (!prev) {
-          const imgs = getSourceImages(source);
-          byId.set(source.id, {
-            ...source,
-            section: getSourceSection(source),
-            imageUrl: imgs[0] || source.imageUrl,
-            images: imgs.length > 0 ? imgs : undefined,
-          });
-        } else {
-          byId.set(source.id, mergeStoredSources(prev, source));
-        }
+        const imgs = getSourceImages(source);
+        byId.set(source.id, {
+          ...source,
+          section: getSourceSection(source),
+          imageUrl: imgs[0] || source.imageUrl,
+          images: imgs.length > 0 ? imgs : undefined,
+        });
       }
     }
 
