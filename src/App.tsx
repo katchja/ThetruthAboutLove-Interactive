@@ -8,6 +8,7 @@ import { LandingPageView } from './components/LandingPageView';
 import { ArchivePageView } from './components/ArchivePageView';
 import { ConversationalPopupWindow } from './components/ConversationalPopupWindow';
 import { BookSettingsModal } from './components/BookSettingsModal';
+import { SafetyDisclosureModal } from './components/SafetyDisclosureModal';
 import {
   Source,
   VectorChunk,
@@ -18,10 +19,12 @@ import {
   ArchiveSection,
   SearchResult,
   ChatModelTier,
+  GuardrailCategory,
   getSourceImages,
   getSourceSection,
 } from './types';
 import { defaultBookMetadata, seedSources } from './data/seedData';
+import { evaluateQueryGuardrails } from './utils/chatGuardrails';
 import {
   indexSource,
   loadArchiveFromDB,
@@ -95,13 +98,14 @@ export default function App() {
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [isLoadingArchive, setIsLoadingArchive] = useState(true);
 
-  // Conversational Chat state
+  // Conversational Chat state (defaults to Gemini Flash-Lite per confirmed configuration)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isChatLoading, setIsChatLoading] = useState(false);
-  const [chatModel, setChatModel] = useState<ChatModelTier>('gemini-3.8-flash');
+  const [chatModel, setChatModel] = useState<ChatModelTier>('gemini-3.1-flash-lite');
   const [isSemanticSearchOpen, setIsSemanticSearchOpen] = useState(false);
   const [isOfflineMode, setIsOfflineMode] = useState(false);
   const [isChatPopupOpen, setIsChatPopupOpen] = useState(false);
+  const [isSafetyModalOpen, setIsSafetyModalOpen] = useState(false);
 
   // Book Metadata
   const [bookMetadata, setBookMetadata] =
@@ -717,6 +721,23 @@ export default function App() {
     setMessages((prev) => [...prev, userMessage]);
     setIsChatLoading(true);
 
+    // 0. Client-side pre-flight guardrail check (works in both online & offline modes)
+    const guardrailCheck = evaluateQueryGuardrails(query);
+    if (!guardrailCheck.allowed && guardrailCheck.refusalReply) {
+      const guardrailMessage: ChatMessage = {
+        id: `msg-ai-${Date.now()}`,
+        role: 'assistant',
+        content: guardrailCheck.refusalReply,
+        timestamp: Date.now(),
+        model: isOfflineMode ? 'Local Safety Guardrail' : chatModel,
+        isOffline: isOfflineMode,
+        guardrailCategory: guardrailCheck.category,
+      };
+      setMessages((prev) => [...prev, guardrailMessage]);
+      setIsChatLoading(false);
+      return;
+    }
+
     // 1. Retrieve top matching vector passages from local vector store
     let searchResults: SearchResult[] = [];
     let citations: Citation[] = [];
@@ -759,6 +780,7 @@ export default function App() {
           citations,
           isOffline: true,
           model: 'Local Vector Synthesizer',
+          guardrailCategory: 'safe',
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
@@ -767,14 +789,18 @@ export default function App() {
       }
 
       // 3. Otherwise: Server-Side Gemini proxy with retrieved contexts and selected model tier
-      const contexts = searchResults.map((sr, idx) => ({
-        id: sr.chunk.id,
-        title: sr.chunk.sourceTitle,
-        type: sr.chunk.sourceType,
-        reference: sr.chunk.reference,
-        snippet: sr.chunk.text,
-        index: idx + 1,
-      }));
+      const contexts = searchResults.map((sr, idx) => {
+        const parentSource = sources.find((s) => s.id === sr.chunk.sourceId);
+        return {
+          id: sr.chunk.id,
+          title: sr.chunk.sourceTitle,
+          type: sr.chunk.sourceType,
+          reference: sr.chunk.reference,
+          snippet: sr.chunk.text,
+          isProtected: Boolean(parentSource?.isProtected),
+          index: idx + 1,
+        };
+      });
 
       const controller = new AbortController();
       const timeoutId = setTimeout(
@@ -791,7 +817,7 @@ export default function App() {
         body: JSON.stringify({
           query,
           contexts,
-          history: messages.slice(-10),
+          history: messages.slice(-8),
           bookTitle: bookMetadata.title,
           authorName: bookMetadata.author,
           model: chatModel,
@@ -804,8 +830,12 @@ export default function App() {
       const contentType = response.headers.get('content-type') || '';
       const rawText = await response.text();
 
-      let data: { reply?: string; model?: string; error?: string } | null =
-        null;
+      let data: {
+        reply?: string;
+        model?: string;
+        error?: string;
+        guardrailCategory?: GuardrailCategory;
+      } | null = null;
       if (
         contentType.includes('application/json') &&
         !rawText.trim().startsWith('<')
@@ -832,19 +862,24 @@ export default function App() {
           citations,
           model: 'Local Vector Synthesizer',
           isOffline: true,
+          guardrailCategory: 'safe',
         };
         setMessages((prev) => [...prev, assistantMessage]);
         return;
       }
+
+      const isGuardrailRefusal =
+        data.guardrailCategory && data.guardrailCategory !== 'safe';
 
       const assistantMessage: ChatMessage = {
         id: `msg-ai-${Date.now()}`,
         role: 'assistant',
         content: data.reply,
         timestamp: Date.now(),
-        citations,
+        citations: isGuardrailRefusal ? undefined : citations,
         model: data.model || chatModel,
         isOffline: false,
+        guardrailCategory: data.guardrailCategory || 'safe',
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
@@ -863,6 +898,7 @@ export default function App() {
         citations,
         model: 'Local Vector Synthesizer',
         isOffline: true,
+        guardrailCategory: 'safe',
       };
       setMessages((prev) => [...prev, fallbackMessage]);
     } finally {
@@ -959,6 +995,7 @@ export default function App() {
           chatModel={chatModel}
           onChangeChatModel={setChatModel}
           isOfflineMode={isOfflineMode}
+          onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
         />
       )}
 
@@ -975,6 +1012,13 @@ export default function App() {
         sources={sources}
         chatModel={chatModel}
         onChangeChatModel={setChatModel}
+        onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
+      />
+
+      {/* CONVERSATIONAL SAFETY, FAIR DISCLOSURE & GUARDRAILS MODAL */}
+      <SafetyDisclosureModal
+        isOpen={isSafetyModalOpen}
+        onClose={() => setIsSafetyModalOpen(false)}
       />
 
       {/* SEMANTIC VECTOR SEARCH MODAL OVERLAY */}

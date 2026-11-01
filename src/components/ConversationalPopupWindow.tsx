@@ -25,6 +25,7 @@ interface ConversationalPopupWindowProps {
   sources: Source[];
   chatModel: ChatModelTier;
   onChangeChatModel: (model: ChatModelTier) => void;
+  onOpenSafetyModal?: () => void;
 }
 
 export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps> = ({
@@ -39,6 +40,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
   sources,
   chatModel,
   onChangeChatModel,
+  onOpenSafetyModal,
 }) => {
   const [inputQuery, setInputQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -249,10 +251,19 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                     {message.role === 'assistant' && (
                       <div className="flex items-center justify-between gap-2 mb-2 pb-2 text-[10px] text-[#5F6368]">
                         <div className="flex items-center gap-1.5 font-mono font-medium text-[#0B0B0C]">
-                          <Sparkles className="w-3 h-3" />
-                          <span>
-                            Catalina&apos;s Synthesis · {message.model || chatModel}
-                          </span>
+                          {message.guardrailCategory && message.guardrailCategory !== 'safe' ? (
+                            <>
+                              <ShieldCheck className="w-3 h-3 text-[#C83E0B]" />
+                              <span>Safety Guardrail Notice</span>
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3 h-3" />
+                              <span>
+                                Catalina&apos;s Synthesis · {message.model || chatModel}
+                              </span>
+                            </>
+                          )}
                         </div>
                         <span className="font-mono tabular-nums">
                           {new Date(message.timestamp).toLocaleTimeString([], {
@@ -325,7 +336,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
           {/* Input Footer */}
           <form
             onSubmit={handleSubmit}
-            className="p-3 bg-[#F1F3F4] shrink-0"
+            className="p-3 bg-[#F1F3F4] shrink-0 space-y-2"
           >
             <div className="relative flex items-center">
               <input
@@ -353,6 +364,22 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                   </span>
                 )}
               </div>
+            </div>
+
+            {/* Subtle Inline Fair AI Disclosure & Wellbeing Notice */}
+            <div className="px-2 flex items-center justify-between gap-2 text-[10px] text-[#5F6368] leading-snug font-sans">
+              <span className="truncate">
+                Personal perspective · Not health, wellbeing, or counselling advice
+              </span>
+              {onOpenSafetyModal && (
+                <button
+                  type="button"
+                  onClick={onOpenSafetyModal}
+                  className="text-[#C83E0B] hover:text-[#A93207] font-medium underline underline-offset-2 shrink-0 cursor-pointer"
+                >
+                  Safety &amp; Disclosure
+                </button>
+              )}
             </div>
           </form>
         </div>

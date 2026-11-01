@@ -89,6 +89,13 @@ export interface Citation {
   index: number;
 }
 
+export type GuardrailCategory =
+  | 'safe'
+  | 'prompt_injection'
+  | 'ip_extraction'
+  | 'off_topic_abuse'
+  | 'wellbeing_support';
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant';
@@ -97,6 +104,7 @@ export interface ChatMessage {
   citations?: Citation[];
   model?: string;
   isOffline?: boolean;
+  guardrailCategory?: GuardrailCategory;
 }
 
 export interface StudioArtifact {

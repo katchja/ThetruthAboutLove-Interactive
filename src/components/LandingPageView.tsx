@@ -10,10 +10,12 @@ import {
   Copy,
   Check,
   RotateCcw,
-  MessageSquare
+  MessageSquare,
+  ShieldCheck
 } from 'lucide-react';
 import { BookMetadata, Source, ChatMessage, Citation, ChatModelTier, getSourceSection } from '../types';
 import { LabsFlowerShape, LabsCloudShape, Labs3DBlobShape } from './LabsFloatingShapes';
+import { FAIR_DISCLOSURE_SHORT_TEXT } from '../utils/chatGuardrails';
 
 const BOOK_COVER_SRC = '/assets/aistudio/Book_cover_8c0e35cc.png';
 
@@ -74,6 +76,7 @@ interface LandingPageViewProps {
   chatModel: ChatModelTier;
   onChangeChatModel: (model: ChatModelTier) => void;
   isOfflineMode: boolean;
+  onOpenSafetyModal?: () => void;
 }
 
 export const LandingPageView: React.FC<LandingPageViewProps> = ({
@@ -86,6 +89,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   onClearChat,
   chatModel,
   onChangeChatModel,
+  onOpenSafetyModal,
 }) => {
   const [quickQuery, setQuickQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -430,6 +434,24 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   </button>
                 </div>
               </div>
+
+              {/* Subtle Inline Fair AI Disclosure & Wellbeing Notice */}
+              <div className="mt-5 pt-4 border-t border-[#E8EAED] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] sm:text-xs text-[#5F6368] leading-relaxed font-sans">
+                <p className="max-w-3xl">
+                  <strong className="font-medium text-[#202124]">Fair Disclosure:</strong>{' '}
+                  {FAIR_DISCLOSURE_SHORT_TEXT}
+                </p>
+                {onOpenSafetyModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenSafetyModal}
+                    className="inline-flex items-center gap-1.5 text-xs font-medium text-[#C83E0B] hover:text-[#A93207] underline underline-offset-4 shrink-0 self-start sm:self-center cursor-pointer transition-colors"
+                  >
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                    <span>Safety &amp; Fair Disclosure</span>
+                  </button>
+                )}
+              </div>
             </form>
 
             {/* Quick Inquiry Bar (always accessible for one-click exploration) */}
@@ -501,9 +523,18 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                       >
                         {message.role === 'assistant' && (
                           <div className="flex items-center justify-between gap-3 mb-4 pb-3 text-xs text-[#5F6368]">
-                            <div className="flex items-center gap-2.5 font-mono font-medium text-[#0B0B0C]">
-                              <Sparkles className="w-4 h-4 text-[#0B0B0C]" />
-                              <span>Manuscript Chat</span>
+                            <div className="flex items-center gap-2.5 font-mono font-medium text-[#0B0B0C] flex-wrap">
+                              {message.guardrailCategory && message.guardrailCategory !== 'safe' ? (
+                                <>
+                                  <ShieldCheck className="w-4 h-4 text-[#C83E0B]" />
+                                  <span>Conversational Safety Guardrail</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Sparkles className="w-4 h-4 text-[#0B0B0C]" />
+                                  <span>Manuscript Chat · {message.model || chatModel}</span>
+                                </>
+                              )}
                             </div>
                             <span className="text-[11px] font-mono tabular-nums text-[#80868B]">
                               {new Date(message.timestamp).toLocaleTimeString([], {
