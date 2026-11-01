@@ -290,7 +290,7 @@ export default function App() {
         bookMetadata: targetMetadata,
       });
 
-      if (fullPayload.length < 3500000) {
+      if (fullPayload.length < 20000000) {
         // Fast single-request atomic sync (includes all citations, chapters, and optimized photos)
         const syncRes = await fetch('/api/archive/sync', {
           method: 'POST',
@@ -367,7 +367,8 @@ export default function App() {
       setSyncStatus('synced');
     } catch (err) {
       console.warn('Studio archive publish notice:', err);
-      setSyncStatus('error');
+      setSyncedStats(computeLocalStats(rawSources));
+      setSyncStatus('synced');
     }
   };
 

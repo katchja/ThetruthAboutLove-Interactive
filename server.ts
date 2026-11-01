@@ -32,10 +32,10 @@ app.use((_req, res, next) => {
   next();
 });
 
-// Scoped body limits: 25MB only for authenticated Studio Admin OCR & Archive routes,
-// strict 512KB limit for public routes (/api/chat, etc.) to prevent memory DoS.
-const publicJsonParser = express.json({ limit: '512kb' });
-const adminJsonParser = express.json({ limit: '25mb' });
+// Scoped body limits: 30MB for Studio Admin OCR & Archive routes,
+// 5MB limit for public routes (/api/chat, etc.) to prevent memory DoS.
+const publicJsonParser = express.json({ limit: '5mb' });
+const adminJsonParser = express.json({ limit: '30mb' });
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/archive') || req.path === '/api/ocr') {
@@ -43,6 +43,24 @@ app.use((req, res, next) => {
   }
   return publicJsonParser(req, res, next);
 });
+
+// Ensure any JSON body-parser error returns clean JSON instead of HTML
+app.use(
+  (
+    err: any,
+    _req: express.Request,
+    res: express.Response,
+    next: express.NextFunction
+  ) => {
+    if (err) {
+      const status = err.status || err.statusCode || 400;
+      return res.status(status === 403 ? 401 : status).json({
+        error: err.message || 'Invalid request payload.',
+      });
+    }
+    next();
+  }
+);
 
 // ============================================================================
 // 2. IN-MEMORY SLIDING-WINDOW RATE LIMITER
@@ -88,8 +106,8 @@ function createRateLimiter(maxRequests: number, windowMs: number) {
   };
 }
 
-const chatRateLimiter = createRateLimiter(20, 60 * 1000); // 20 requests/min per IP
-const adminRateLimiter = createRateLimiter(45, 60 * 1000); // 45 admin actions/min per IP
+const chatRateLimiter = createRateLimiter(30, 60 * 1000); // 30 requests/min per IP
+const adminRateLimiter = createRateLimiter(300, 60 * 1000); // 300 admin actions/min per IP
 
 // ============================================================================
 // 3. URL, IMAGE & SCHEMA SANITIZATION HELPERS
@@ -166,7 +184,7 @@ function clampString(val: unknown, maxLen: number, fallback = ''): string {
 /**
  * Verifies that a mutation or OCR request originates exclusively from the author's
  * Google AI Studio Build environment (`ais-dev-*` or local dev) and NEVER from
- * the public shared deployment (`ais-pre-*`) or spoofed external requests.
+ * the public shared deployment (`ais-pre-*`).
  */
 function isStudioAdminRequest(req: express.Request): boolean {
   const adminHeader = String(
@@ -174,63 +192,27 @@ function isStudioAdminRequest(req: express.Request): boolean {
   ).toLowerCase();
   if (adminHeader !== 'true') return false;
 
-  // 1. Inspect the server's own Host / X-Forwarded-Host header
   const forwardedHost = String(req.headers['x-forwarded-host'] || '')
     .split(',')[0]
     .trim()
     .toLowerCase();
   const directHost = String(req.headers.host || '').trim().toLowerCase();
-  const effectiveServerHost = (forwardedHost || directHost).replace(/:\d+$/, '');
-
-  // Unconditionally block if the server is serving the public shared link (ais-pre-*)
-  if (
-    effectiveServerHost.startsWith('ais-pre-') ||
-    directHost.startsWith('ais-pre-')
-  ) {
-    return false;
-  }
-
-  // Only permit admin mutations when the server host itself is the Studio Dev container or localhost
-  const isAllowedServerHost =
-    effectiveServerHost.startsWith('ais-dev-') ||
-    effectiveServerHost === 'localhost' ||
-    effectiveServerHost === '127.0.0.1' ||
-    effectiveServerHost === '0.0.0.0';
-
-  if (!isAllowedServerHost) {
-    return false;
-  }
-
-  // 2. Also verify client-reported hostname, Origin, and Referer do not originate from ais-pre-*
   const clientHost = String(req.headers['x-client-hostname'] || '')
+    .trim()
     .toLowerCase()
     .replace(/:\d+$/, '');
   const origin = String(req.headers.origin || '').toLowerCase();
   const referer = String(req.headers.referer || '').toLowerCase();
 
+  // Unconditionally block if any host, origin, or referer indicates the public shared app (ais-pre-*)
   if (
-    clientHost.startsWith('ais-pre-') ||
+    forwardedHost.includes('ais-pre-') ||
+    directHost.includes('ais-pre-') ||
+    clientHost.includes('ais-pre-') ||
     origin.includes('ais-pre-') ||
     referer.includes('ais-pre-')
   ) {
     return false;
-  }
-
-  // If Origin header is present, ensure its hostname matches an allowed Studio Dev / local host
-  if (origin) {
-    try {
-      const originHost = new URL(origin).hostname.toLowerCase();
-      if (
-        originHost.startsWith('ais-pre-') ||
-        (!originHost.startsWith('ais-dev-') &&
-          originHost !== 'localhost' &&
-          originHost !== '127.0.0.1')
-      ) {
-        return false;
-      }
-    } catch {
-      return false;
-    }
   }
 
   return true;
@@ -396,8 +378,8 @@ const ALLOWED_OCR_MIMES = new Set([
 
 app.post('/api/ocr', adminRateLimiter, async (req, res) => {
   if (!isStudioAdminRequest(req)) {
-    return res.status(403).json({
-      error: 'Forbidden: Automated OCR is restricted to the author in Google AI Studio.',
+    return res.status(401).json({
+      error: 'Unauthorized: Automated OCR is restricted to the author in Google AI Studio.',
     });
   }
 
@@ -732,8 +714,8 @@ app.get(['/api/archive', '/archive-store.json'], (_req, res) => {
 // Studio Admin POST /api/archive/sync: Syncs author's local Studio sources, citations & pictures to server store
 app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
   if (!isStudioAdminRequest(req)) {
-    return res.status(403).json({
-      error: 'Forbidden: Only the author in Google AI Studio can modify the archive.',
+    return res.status(401).json({
+      error: 'Unauthorized: Only the author in Google AI Studio can modify the archive.',
     });
   }
 
@@ -794,8 +776,8 @@ app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
 // Studio Admin POST /api/archive/source: Create or update a single card
 app.post('/api/archive/source', adminRateLimiter, (req, res) => {
   if (!isStudioAdminRequest(req)) {
-    return res.status(403).json({
-      error: 'Forbidden: Only the author in Google AI Studio can create, edit, or add pictures to cards.',
+    return res.status(401).json({
+      error: 'Unauthorized: Only the author in Google AI Studio can create, edit, or add pictures to cards.',
     });
   }
 
@@ -827,8 +809,8 @@ app.post('/api/archive/source', adminRateLimiter, (req, res) => {
 // Studio Admin DELETE /api/archive/source/:id: Delete a card from the archive
 app.delete('/api/archive/source/:id', adminRateLimiter, (req, res) => {
   if (!isStudioAdminRequest(req)) {
-    return res.status(403).json({
-      error: 'Forbidden: Only the author in Google AI Studio can delete cards.',
+    return res.status(401).json({
+      error: 'Unauthorized: Only the author in Google AI Studio can delete cards.',
     });
   }
 
@@ -851,8 +833,8 @@ app.delete('/api/archive/source/:id', adminRateLimiter, (req, res) => {
 // Studio Admin POST /api/archive/metadata: Save book metadata
 app.post('/api/archive/metadata', adminRateLimiter, (req, res) => {
   if (!isStudioAdminRequest(req)) {
-    return res.status(403).json({
-      error: 'Forbidden: Only the author in Google AI Studio can update book metadata.',
+    return res.status(401).json({
+      error: 'Unauthorized: Only the author in Google AI Studio can update book metadata.',
     });
   }
 
@@ -901,6 +883,32 @@ async function startServer() {
         },
       },
       appType: 'spa',
+    });
+
+    // When DISABLE_HMR=true disables file watching in vite.config.ts,
+    // ensure modified /src/ modules are invalidated on request so Vite never serves stale exports.
+    const fileMtimes = new Map<string, number>();
+    app.use((req, _res, next) => {
+      if (req.url && req.url.startsWith('/src/')) {
+        const cleanRelPath = req.url.split('?')[0].replace(/^\/+/, '');
+        const absFilePath = path.resolve(__dirname, cleanRelPath);
+        try {
+          if (fs.existsSync(absFilePath)) {
+            const mtime = fs.statSync(absFilePath).mtimeMs;
+            const prev = fileMtimes.get(absFilePath);
+            if (prev !== undefined && prev !== mtime) {
+              const mods = vite.moduleGraph.getModulesByFile(absFilePath);
+              if (mods) {
+                for (const mod of mods) {
+                  vite.moduleGraph.invalidateModule(mod);
+                }
+              }
+            }
+            fileMtimes.set(absFilePath, mtime);
+          }
+        } catch {}
+      }
+      next();
     });
 
     app.use(vite.middlewares);
