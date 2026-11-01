@@ -2,6 +2,60 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function () {
+        window.addEventListener(
+          'unhandledrejection',
+          function (event) {
+            var r = event && event.reason;
+            var msg = typeof r === 'string' ? r : r && r.message ? r.message : '';
+            if (
+              msg.indexOf('WebSocket') !== -1 ||
+              msg.indexOf('vite-hmr') !== -1 ||
+              msg.indexOf('AbortError') !== -1 ||
+              msg.indexOf('NotAllowedError') !== -1
+            ) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+            }
+          },
+          true
+        );
+        var NativeWS = window.WebSocket;
+        if (typeof NativeWS === 'function') {
+          var PatchedWS = function (url, protocols) {
+            var urlStr = String(url || '');
+            var protoStr = Array.isArray(protocols) ? protocols.join(',') : String(protocols || '');
+            if (protoStr.indexOf('vite-hmr') !== -1 || urlStr.indexOf(':24678') !== -1) {
+              var dummy = new EventTarget();
+              dummy.readyState = 1;
+              dummy.protocol = 'vite-hmr';
+              dummy.extensions = '';
+              dummy.bufferedAmount = 0;
+              dummy.binaryType = 'blob';
+              dummy.url = urlStr;
+              dummy.send = function () {};
+              dummy.close = function () {
+                dummy.readyState = 3;
+              };
+              setTimeout(function () {
+                var evt = new Event('open');
+                if (typeof dummy.onopen === 'function') dummy.onopen(evt);
+                dummy.dispatchEvent(evt);
+              }, 0);
+              return dummy;
+            }
+            return protocols !== undefined ? new NativeWS(url, protocols) : new NativeWS(url);
+          };
+          PatchedWS.prototype = NativeWS.prototype;
+          PatchedWS.CONNECTING = NativeWS.CONNECTING;
+          PatchedWS.OPEN = NativeWS.OPEN;
+          PatchedWS.CLOSING = NativeWS.CLOSING;
+          PatchedWS.CLOSED = NativeWS.CLOSED;
+          window.WebSocket = PatchedWS;
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>The Truth About Love | Catalina Butnaru</title>
     <meta name="description" content="A conversational manuscript, archive, and notebook for 'The Truth About Love' by Catalina Butnaru. Exploring love as a fundamental life force, unprogrammable self-love, healthy romantic love, the love of humanity, and more at the intersection of information theory, philosophy, depth psychology, and cognitive science." />
