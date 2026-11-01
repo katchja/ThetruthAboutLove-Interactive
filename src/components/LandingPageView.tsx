@@ -20,6 +20,7 @@ import {
 import { BookMetadata, Source, ChatMessage, Citation, VoiceSettings, ChatModelTier, getSourceSection } from '../types';
 import { speechEngine } from '../utils/speechEngine';
 import bookCoverImg from '../assets/images/assets/aistudio/Cover_6f04220a.png';
+import { LabsFlowerShape, LabsCloudShape } from './LabsFloatingShapes';
 
 const DEFAULT_AUTHOR_VOICE_ID = 'voice_lp7vh3bk6taq';
 
@@ -333,11 +334,34 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
       {/* ========================================================================
           SECTION 1: ROTATING "TRUTHS ABOUT LOVE" CAROUSEL (Google Labs Aesthetic)
           ======================================================================== */}
-      <section className="relative overflow-hidden pt-16 pb-20 bg-gradient-to-b from-[#F8F9FA] via-[#FFFFFF] to-[#FFFFFF]">
-        <div className="max-w-5xl mx-auto px-6 sm:px-8 lg:px-12 text-center">
-          <div className="space-y-10 py-8 sm:py-12">
+      <section className="relative overflow-hidden pt-20 pb-24 bg-[#F4F4F9]/65">
+        {/* Centered / Offset 3-Lobe Cloud Gradient Backdrop behind Headline (Reference Slide 2) */}
+        <div
+          className="pointer-events-none absolute inset-0 flex items-center justify-center overflow-hidden"
+          aria-hidden="true"
+        >
+          <LabsCloudShape
+            variant="yellow-pink"
+            className="w-[460px] sm:w-[640px] md:w-[740px] h-[420px] sm:h-[580px] md:h-[660px] opacity-90 labs-shape-float-breathe -translate-y-2 sm:translate-x-4"
+          />
+        </div>
+
+        {/* Secondary Floating 8-Petal Flower Shape on Upper Left Margin */}
+        <LabsFlowerShape
+          variant="pink-yellow"
+          className="hidden lg:block absolute -left-24 -top-20 w-[260px] h-[260px] opacity-75 labs-shape-float-rotate"
+        />
+
+        {/* Secondary Floating 8-Petal Flower Shape on Lower Right Margin */}
+        <LabsFlowerShape
+          variant="soft-bloom"
+          className="hidden md:block absolute -right-20 -bottom-24 w-[240px] h-[240px] opacity-70 labs-shape-slow-spin"
+        />
+
+        <div className="relative z-10 max-w-5xl mx-auto px-6 sm:px-8 lg:px-12 text-center">
+          <div className="space-y-10 py-10 sm:py-14">
             {/* Kicker */}
-            <div className="inline-flex items-center gap-3 text-xs font-mono font-medium uppercase tracking-[0.22em] text-[#5F6368] pb-2">
+            <div className="inline-flex items-center gap-3 text-xs font-mono font-medium uppercase tracking-[0.22em] text-[#202124] pb-2">
               <Flame className="w-3.5 h-3.5 text-[#0B0B0C]" />
               <span>Truths About Love</span>
             </div>
@@ -346,13 +370,13 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             <div className="min-h-[180px] sm:min-h-[220px] flex flex-col items-center justify-center px-4 sm:px-10">
               <blockquote
                 key={currentTruth.id}
-                className="font-display font-normal text-2xl sm:text-4xl md:text-5xl text-[#0B0B0C] leading-[1.24] tracking-tight max-w-4xl mx-auto transition-opacity duration-500"
+                className="font-display font-medium text-2xl sm:text-4xl md:text-5xl text-[#1E1F18] leading-[1.2] tracking-tight max-w-4xl mx-auto transition-opacity duration-500"
               >
                 &ldquo;{currentTruth.quote}&rdquo;
               </blockquote>
             </div>
 
-            {/* Primary Interactive Trigger: "Why should I care?" */}
+            {/* Primary Interactive Trigger */}
             <div className="flex flex-col items-center justify-center pt-4">
               <button
                 type="button"
@@ -563,16 +587,12 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                       className="group rounded-3xl bg-[#FFFFFF] hover:bg-[#F1F3F4] p-6 sm:p-8 flex flex-col justify-between gap-6 transition-all"
                     >
                       <div className="space-y-4">
-                        <div className="flex items-center justify-between gap-2 text-xs text-[#5F6368] font-mono uppercase tracking-wider font-medium">
-                          <span>{item.category}</span>
-                          <Sparkles className="w-3.5 h-3.5 text-[#0B0B0C] opacity-60 group-hover:opacity-100 transition-opacity" />
+                        <div className="flex items-center justify-between gap-2">
+                          <h4 className="text-base sm:text-lg font-display font-medium text-[#0B0B0C] leading-snug">
+                            {item.title}
+                          </h4>
+                          <Sparkles className="w-3.5 h-3.5 text-[#0B0B0C] opacity-60 group-hover:opacity-100 transition-opacity shrink-0" />
                         </div>
-                        <h4 className="text-base sm:text-lg font-display font-medium text-[#0B0B0C] leading-snug">
-                          {item.title}
-                        </h4>
-                        <p className="text-xs sm:text-sm text-[#5F6368] leading-relaxed font-sans">
-                          {item.description}
-                        </p>
                         <p className="text-xs font-sans italic text-[#202124] bg-[#F8F9FA] p-4 rounded-2xl leading-relaxed">
                           &ldquo;{item.prompt}&rdquo;
                         </p>
@@ -868,22 +888,33 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
       </section>
 
       {/* ========================================================================
-          SECTION 4: THE FIERCE LOVERS MANIFESTO CALLOUT (Google Labs Dark Callout)
+          SECTION 4: THE FIERCE LOVERS MANIFESTO CALLOUT (Google Labs Light Canvas + Giant Flower Backdrop)
           ======================================================================== */}
-      <section className="max-w-5xl mx-auto px-4 sm:px-6 pt-16">
-        <div className="p-10 sm:p-14 rounded-3xl bg-[#0B0B0C] text-[#FFFFFF] relative overflow-hidden">
-          <Quote className="w-24 h-24 text-white/5 absolute right-6 top-6 pointer-events-none" />
-          <div className="max-w-3xl space-y-7 relative z-10">
-            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-medium uppercase tracking-widest bg-[#202124] text-[#E8EAED]">
-              <Flame className="w-3.5 h-3.5 text-white" />
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-16">
+        <div className="p-10 sm:p-16 lg:p-20 rounded-[2.5rem] bg-[#F3F3FA] text-[#0B0B0C] relative overflow-hidden">
+          {/* Giant Edge-Cropped 8-Petal Scalloped Flower on Right (Reference Slide 1: "Chapter 1") */}
+          <LabsFlowerShape
+            variant="yellow-pink"
+            className="absolute -right-28 sm:-right-36 lg:-right-28 -top-16 sm:-top-24 w-[380px] sm:w-[560px] lg:w-[650px] h-[380px] sm:h-[560px] lg:h-[650px] opacity-95 labs-shape-float-rotate"
+          />
+
+          {/* Subtle Secondary Floating Cloud-Clover on Bottom Left */}
+          <LabsCloudShape
+            variant="pink-yellow"
+            className="hidden sm:block absolute -left-28 -bottom-32 w-[320px] h-[300px] opacity-60 labs-shape-float-breathe"
+          />
+
+          <div className="max-w-2xl space-y-8 relative z-10">
+            <div className="inline-flex items-center gap-2.5 px-3.5 py-1.5 rounded-full text-xs font-mono font-semibold uppercase tracking-widest bg-[#FFFFFF]/85 text-[#1E1F18]">
+              <Flame className="w-3.5 h-3.5 text-[#0B0B0C]" />
               <span>THE FIERCE LOVERS MANIFESTO</span>
             </div>
 
-            <h2 className="text-2xl sm:text-3xl font-display font-normal text-[#FFFFFF] leading-tight">
+            <h2 className="text-3xl sm:text-4xl lg:text-5xl font-display font-medium text-[#1E1F18] leading-[1.12] tracking-tight">
               &ldquo;Love is not an emotion. It is a fundamental life force.&rdquo;
             </h2>
 
-            <div className="space-y-5 text-sm sm:text-base text-[#BDC1C6] leading-relaxed font-sans">
+            <div className="space-y-5 text-sm sm:text-base text-[#202124] leading-relaxed font-sans max-w-xl">
               <p>
                 You expand who you are and dissolve the distortions that make you less than: the power dynamics, the control disguised as deep connection, the programmatic content regulating your emotions, and the synthetic AI lovers.
               </p>
@@ -894,17 +925,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
             <div className="pt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
               <div className="space-y-1">
-                <p className="text-base font-display font-medium text-[#FFFFFF]">
+                <p className="text-base font-display font-medium text-[#0B0B0C]">
                   This manifesto is for you, fierce lovers!
                 </p>
-                <p className="text-xs font-mono text-[#9AA0A6]">
-                  — <strong className="text-[#FFFFFF] font-medium">Catalina Butnaru</strong>, author of <em>The Truth About Love</em>
+                <p className="text-xs font-mono text-[#5F6368]">
+                  — <strong className="text-[#0B0B0C] font-medium">Catalina Butnaru</strong>, author of <em>The Truth About Love</em>
                 </p>
               </div>
 
               <button
                 onClick={handlePlayVoiceIntro}
-                className="px-6 py-3.5 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-sans font-medium flex items-center gap-2.5 transition-colors self-start sm:self-auto cursor-pointer"
+                className="px-7 py-4 rounded-full bg-[#FF2A6D] hover:bg-[#E61556] text-white text-xs font-sans font-medium flex items-center gap-2.5 transition-colors self-start sm:self-auto cursor-pointer"
               >
                 <Volume2 className="w-3.5 h-3.5" />
                 <span>Hear Catalina Recite the Manifesto</span>
@@ -915,20 +946,26 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
       </section>
 
       {/* The Five Dimensions of Love Overview */}
-      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-24">
-        <div className="text-center max-w-2xl mx-auto space-y-5 mb-16">
+      <section className="relative max-w-6xl mx-auto px-4 sm:px-6 pt-28">
+        {/* Ambient Floating Flower Accent behind Section Header */}
+        <LabsFlowerShape
+          variant="soft-bloom"
+          className="pointer-events-none absolute left-1/2 -translate-x-1/2 top-8 w-[340px] sm:w-[440px] h-[340px] sm:h-[440px] opacity-55 labs-shape-float-breathe"
+        />
+
+        <div className="relative z-10 text-center max-w-2xl mx-auto space-y-5 mb-16">
           <span className="text-xs font-mono font-medium text-[#5F6368] uppercase tracking-widest block pb-1">
             THE ARCHITECTURE OF LOVE
           </span>
-          <h2 className="text-2xl sm:text-3xl font-display font-normal text-[#0B0B0C]">
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-display font-medium text-[#0B0B0C]">
             The Five Dimensions of Love
           </h2>
-          <p className="text-xs sm:text-sm text-[#5F6368] leading-relaxed pt-1 font-sans">
+          <p className="text-xs sm:text-sm text-[#202124] leading-relaxed pt-1 font-sans">
             Love expands what theoretical biologist Stuart Kauffman calls the adjacent possible. It is much more like syntropy than an emotion. Here&apos;s how love expands us across five dimensions of our existence.
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {[
             {
               title: 'The Love of Self',
@@ -1059,8 +1096,14 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
       {/*Interactive Archive*/}
       <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-24">
-        <div className="p-10 sm:p-14 rounded-3xl bg-[#F8F9FA] space-y-10">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
+        <div className="relative overflow-hidden p-10 sm:p-14 rounded-3xl bg-[#F4F4F9] space-y-10">
+          {/* Floating Cloud-Flower Accent on Right Edge */}
+          <LabsCloudShape
+            variant="yellow-pink"
+            className="absolute -right-24 -top-20 w-[340px] sm:w-[420px] h-[320px] sm:h-[390px] opacity-75 labs-shape-float-rotate"
+          />
+
+          <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-8">
             <div className="space-y-4 max-w-2xl">
               <h2 className="text-2xl sm:text-3xl font-display font-normal text-[#0B0B0C]">
                 Interactive Archive
@@ -1081,7 +1124,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
 
           {/* Archive Section breakdown highlights */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
+          <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 gap-6 pt-2">
             {[
               {
                 label: 'Authored by Catalina',
@@ -1097,7 +1140,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               <button
                 key={i}
                 onClick={onOpenArchive}
-                className="p-6 rounded-2xl bg-[#FFFFFF] hover:bg-[#F1F3F4] text-left transition-all group space-y-1.5 cursor-pointer"
+                className="p-6 rounded-2xl bg-[#FFFFFF]/90 hover:bg-[#FFFFFF] text-left transition-all group space-y-1.5 cursor-pointer"
               >
                 <span className="text-2xl font-medium font-display text-[#0B0B0C] block group-hover:scale-105 transition-transform">
                   {cat.count}

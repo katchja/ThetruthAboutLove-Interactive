@@ -5,7 +5,7 @@ export const defaultBookMetadata: BookMetadata = {
   subtitle: 'Finding Your Power Through Love',
   author: 'Catalina Butnaru',
   authorRole: 'Author, AI Ethicist & Depth Psychology Researcher',
-  authorBio: 'Catalina Butnaru is an author, researcher, and former AI GRC practitioner. After surviving severe relational trauma, burnout, and a decade of functional CPTSD, she experienced a profound revelation: love is not an emotion to be managed, but the fundamental life force of human consciousness.',
+  authorBio: 'Catalina Butnaru is an author, researcher, and former AI GRC practitioner. After surviving relational trauma and burnout she experienced a profound revelation: love is not an emotion to be managed, but the fundamental life force of human consciousness.',
   isbn: '',
   publisher: 'Self-published interactive manuscript',
   publicationYear: '2025',
@@ -64,14 +64,12 @@ export const seedSources: Source[] = [
 
 Love is not an emotion. It is a fundamental life force.
 
-You expand who you are and dissolve the distortions that make you less than: the power dynamics, the control disguised as deep connection, the programmatic content regulating your emotions, and the synthetic AI lovers.
+It is a force that expands our Self into a larger existence, like syntropy. It is felt as a surplus of energy, pleasure and joy.
 
-By 2030, inner life and love will collide with a changed collective reality, one where AI-generated thought takes more room than your truth. 
+But it needs to be protected. Today, AI generated content and feed-dependent emotionality has taken up too more space in our inner lives than our own truth. 
 
-To preserve the power of love, and to live a life to the highest standard, here's a place to start.
-
-This manifesto is for you, fierce lovers!`,
-    tags: ['Manifesto', 'Life Force', '2030 Horizon', 'Synthetic AI Lovers', 'Fierce Lovers'],
+This books helps you get it all back. Come rediscover your truth and your power through love.`,
+    tags: ['Love', 'Life Force', 'AI Renaissance', 'Truth Lovers'],
     isProtected: false,
     createdAt: SEED_BASE_TIME - 86400000 * 7,
   },
@@ -125,21 +123,24 @@ Its purpose is expansion.
 Love makes us larger, wiser, and whole.
 
 In theoretical biology, Stuart Kauffman speaks of the "adjacent possible." 
-It is the new realm of potential that opens when we cross a boundary. 
-Love is what propels us across that boundary. 
-It draws us into affinity with another person, craft, or domain. 
+It is the new realm of possibilities that opens up when we go beyond our comfort zone. 
+Love is what propels us to take down our personal walls and overcome perceived limitations.  
+It draws us into affinity with another person, craft, life adventure, passion, career and in affinity with the world and humanity at large. 
 It enlarges the scope of our existence.
+That is called syntropy.
+Whereas entropy defies dacay and death, syntropy tends towards life. That's why love is a life force.
 
-In cognitive science, we speak of the Markov blanket. 
+In information theory, we speak of the Markov blanket, a term introduced by Karl Friston. 
 It is the boundary that separates the inner world from the outer world. 
-Our psychological blankets are made of fear, limiting beliefs, and old stories. 
-They keep us safe, but small.
+Our psychological blankets are defined within the Self model. Thse boundaries are made of self-referential and self-evidencing beliefs. 
+They keep us safe, but stagnant. Love provides us the energy to grow past stangnacy. 
+
 
 Love weaves a different blanket. 
 It makes the outer world exciting to explore. 
-It makes old dogmas easy to surrender. 
-Through love, consciousness evolves through meaning-making, not blind selection.`,
-    tags: ['Adjacent Possible', 'Markov Blanket', 'Evolution', 'Meaning'],
+It makes old models of reality easier to let go of so we may find truth or a different, more expansive view of our life and reality. 
+Through love, consciousness evolves through this expansive, satisfying meaning-making process fuelled by love.`,
+    tags: ['Adjacent Possible', 'Markov Blanket', 'Evolution', 'Meaning', 'Syntropy'],
     isProtected: true,
     createdAt: SEED_BASE_TIME - 86400000 * 5,
   },
