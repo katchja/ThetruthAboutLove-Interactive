@@ -5,7 +5,6 @@ import {
   Sparkles,
   ShieldCheck,
   Trash2,
-  MessageSquare,
   Copy,
   Check,
   ZoomIn,
@@ -549,7 +548,6 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
               }}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-semibold transition-colors"
             >
-              <MessageSquare className="w-3.5 h-3.5" />
               Ask Manuscript About This
             </button>
           </div>

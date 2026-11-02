@@ -10,7 +10,6 @@ import {
   Copy,
   Check,
   RotateCcw,
-  MessageSquare,
   ShieldCheck,
   Heart
 } from 'lucide-react';
@@ -327,10 +326,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               </div>
 
               <div className="flex flex-wrap items-center gap-3 self-start lg:self-center text-xs font-mono text-[#5F6368]">
-                <ShieldCheck className="w-4 h-4 text-[#C83E0B] shrink-0" />
                 <span className="text-[#0B0B0C] font-medium">Gemini Flash-Lite</span>
                 <span aria-hidden="true">·</span>
-                <span>Safeguarded Companion</span>
+                <span>Safeguarded version</span>
               </div>
             </div>
           </div>
@@ -439,7 +437,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                     }}
                     className="px-4 py-2.5 rounded-full bg-[#FFFFFF] hover:bg-[#C83E0B] text-[#202124] hover:text-white text-xs sm:text-sm font-sans font-medium transition-all flex items-center gap-2 text-left cursor-pointer group"
                   >
-                    <MessageSquare className="w-3.5 h-3.5 text-[#0B0B0C] group-hover:text-white shrink-0 transition-colors" />
                     <span>{q}</span>
                   </button>
                 ))}
@@ -556,7 +553,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                                 }}
                                 className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#F1F3F4] transition-colors cursor-pointer"
                               >
-                                <MessageSquare className="w-3.5 h-3.5 text-current" />
                                 <span>Follow-Up</span>
                               </button>
                             </div>
@@ -656,7 +652,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   href="#conversational-archive"
                   className="px-7 py-4 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white font-sans font-medium text-sm transition-all flex items-center gap-2.5"
                 >
-                  <MessageSquare className="w-4 h-4" />
                   <span>Ask Manuscript</span>
                   <ArrowRight className="w-4 h-4" />
                 </a>
@@ -902,7 +897,6 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                     }}
                     className="self-start px-4 py-2.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-sans font-medium transition-all flex items-center gap-2 mt-2 group cursor-pointer"
                   >
-                    <MessageSquare className="w-3.5 h-3.5" />
                     <span>Talk to the manuscript</span>
                     <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                   </button>
