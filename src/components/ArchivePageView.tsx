@@ -306,12 +306,12 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                   MANUSCRIPT ARCHIVE &amp; CITATIONS
                 </span>
                 <span className="text-xs text-[#5F6368] font-mono">
-                  {sources.length} Cataloged Sources · {totalVectorChunks} Vector Passages
+                  {sources.length} Sources · {totalVectorChunks} Passages
                 </span>
               </div>
 
               <h1 className="text-2xl sm:text-3xl lg:text-4xl font-display font-normal text-[#0B0B0C] tracking-tight">
-                Curated Reference Archive
+                Curated Literature
               </h1>
               <p className="text-xs sm:text-sm text-[#5F6368] max-w-3xl leading-relaxed font-sans">
                 Manuscript chapters, autobiographical notes, hand-written notes, reference literature and research citations with attribution and recognitions live on the separate Manuscript Archive &amp; Citations Page. Explore at your leisure. Original documents are protected to respect intellectual property.
@@ -458,9 +458,6 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
               <h2 className="text-xl sm:text-2xl font-display font-normal text-[#0B0B0C]">
                 Authored by Catalina
               </h2>
-              <p className="text-xs text-[#5F6368] font-sans">
-                Original manuscript chapters, Substack essays, OCR scans, and works authored by Catalina Butnaru.
-              </p>
             </div>
 
             <div className="flex items-center gap-3 self-start sm:self-auto">
@@ -769,9 +766,6 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
               <h2 className="text-xl sm:text-2xl font-display font-normal text-[#0B0B0C]">
                 Literature, References and Quotations
               </h2>
-              <p className="text-xs text-[#5F6368] font-sans">
-                Compressed scholarly list of external books, research citations, and curated quotations.
-              </p>
             </div>
 
             <div className="flex items-center gap-3 self-start sm:self-auto flex-wrap">
@@ -791,7 +785,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                   ) : (
                     <CloudUpload className="w-3.5 h-3.5 text-[#0B0B0C]" />
                   )}
-                  <span>Sync Citations to Public</span>
+                  <span>Sync to Public</span>
                 </button>
               )}
               {isStudioAdmin && onOpenAddSource && (
@@ -801,7 +795,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                   className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-medium transition-colors cursor-pointer"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Add Reference / Quotation</span>
+                  <span>Add</span>
                 </button>
               )}
             </div>
