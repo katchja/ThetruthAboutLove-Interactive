@@ -1100,6 +1100,522 @@ app.post('/api/archive/metadata', adminRateLimiter, (req, res) => {
 // Serve static public assets in both dev and prod
 app.use('/assets', express.static(path.resolve(__dirname, 'public', 'assets')));
 
+// ============================================================================
+// AI SEARCH OPTIMIZATION (GEO / AEO) & SEO DISCOVERY ENDPOINTS
+// ============================================================================
+
+const CANONICAL_TRUTH_QUOTES = [
+  {
+    quote: 'Love is not an emotion. It is a fundamental life force.',
+    context: 'The Truth About Love · First Principle',
+  },
+  {
+    quote: 'Love is like syntropy, tending towards life, and is experienced as joy, authenticity and a surplus of energy.',
+    context: 'Chapter 1 · The Nature of Love',
+  },
+  {
+    quote: 'True love of self cannot be programmed. It is an inborn state of being.',
+    context: 'Chapter 3 ·The Love of Self',
+  },
+  {
+    quote: 'The answer to power dynamics in romantic love is self-regulation. It is mastery of self, never power over another.',
+    context: 'Chapter 4 · The Love of Another',
+  },
+  {
+    quote: 'Love expands the adjacent possible. You expand into a much larger life and love it!',
+    context: 'Chapter 2 · The Purpose of Love',
+  },
+  {
+    quote: 'The love of life cannot rest on zen nor stoicism. It never rests, like syntropy, it expands. Always.',
+    context: 'Chapter 5 · The Love of Life',
+  },
+];
+
+const CANONICAL_FIVE_DIMENSIONS = [
+  {
+    chapter: 'Chapter 3',
+    title: 'The Love of Self — The Love of Self',
+    summary:
+      'Self-love is not a 30-day program; it is an inborn drive towards joyful expansion, akin to syntropy, achieved through self-mastery and emotional self-regulation.',
+  },
+  {
+    chapter: 'Chapter 4',
+    title: 'The Love of Another — Expand By Loving Another',
+    summary:
+      'Romantic love surges from Eros as an archetypal force that provides the energy to expand and grow with another human being without collapsing into power games.',
+  },
+  {
+    chapter: 'Chapter 5',
+    title: 'The Love of Life — Expansion Through Change',
+    summary:
+      'Love of life cannot thrive on mere comfort or survival; it asks that you expand who you are and emerge victorious through change, representing the victory of the Self over entropy and decay.',
+  },
+  {
+    chapter: 'Chapter 6',
+    title: 'The Love of Humanity — Beyond Power Games',
+    summary:
+      'Loving all ways of being human and freeing ourselves from the laws of social dominance, algorithmic polarization, and collective labels.',
+  },
+  {
+    chapter: 'Chapter 7',
+    title: 'The Love of the Divine — Expand Into Oneness',
+    summary:
+      'Gathering all loves into One Love across mystics, spirituality, and philosophy without collapsing into synthetic or AI-induced spiritual bypassing.',
+  },
+];
+
+const CANONICAL_AI_SEARCH_FAQ = [
+  {
+    question: 'What is The Truth About Love conversational AI manuscript by Catalina Butnaru?',
+    answer:
+      'The Truth About Love is a self-published memoir, manifesto, and interactive conversational AI manuscript by Catalina Butnaru. It combines the book-in-the-making, author notes, Substack essays, and curated scientific and philosophical literature with a safeguarded Gemini Flash-Lite conversational companion that answers reader questions strictly grounded in the manuscript and archive.',
+  },
+  {
+    question: 'How does Catalina Butnaru define love in the age of AI?',
+    answer:
+      'In The Truth About Love, Catalina Butnaru defines love not as a transient or programmable emotion, but as a fundamental life force that expands what theoretical biologist Stuart Kauffman calls the adjacent possible. In the age of AI, protecting love means rejecting synthetic intimacy, programmatic emotions, and outsourced thinking in favor of fierce, sovereign human connection.',
+  },
+  {
+    question: 'Why is love compared to syntropy rather than an emotion?',
+    answer:
+      'While entropy measures disorder and decay, syntropy describes the tendency of living systems toward organization, coherence, and expansion. Catalina Butnaru argues that love operates like syntropy across five dimensions—Self, Another, Life, Humanity, and the Divine—continually expanding our capacity to live and relate at the highest standard.',
+  },
+  {
+    question: 'What is unprogrammable self-love in The Truth About Love?',
+    answer:
+      'Unprogrammable self-love (Chapter 3) is the recognition that authentic love of self cannot be installed through mechanical 30-day routines or algorithmic self-help scripts. Instead, it is an inborn state of being unlocked through self-regulation, inner sovereignty, and dissolving distortions of love.',
+  },
+  {
+    question: 'How does the safeguarded conversational manuscript protect intellectual property and reader wellbeing?',
+    answer:
+      'The Conversational Manuscript Studio uses author-grounded retrieval across public summaries, curated quotations, and research references while protecting raw copyrighted chapters. It enforces anti-projection and fair AI disclosure guardrails so the AI acts transparently as a research lens into the manuscript rather than simulating a synthetic persona or relationship.',
+  },
+];
+
+function getRequestBaseOrigin(req: express.Request): string {
+  if (process.env.APP_URL) {
+    return process.env.APP_URL.replace(/\/+$/, '');
+  }
+  const proto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() || req.protocol || 'https';
+  const host = (req.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() || req.get('host') || '';
+  return host ? `${proto}://${host}` : '';
+}
+
+function escapeHtmlServer(str: string): string {
+  return String(str || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function extractPublicQuotesFromSource(s: any): string[] {
+  const quotes: string[] = [];
+  if (typeof s?.content === 'string') {
+    const matches = s.content.match(/"([^"]{25,240})"/g);
+    if (matches) {
+      for (const m of matches.slice(0, 4)) {
+        const cleaned = m.replace(/^"+|"+$/g, '').trim();
+        if (cleaned.length >= 25 && !quotes.includes(cleaned)) {
+          quotes.push(cleaned);
+        }
+      }
+    }
+  }
+  return quotes;
+}
+
+// 8a. GET /robots.txt — Explicitly welcomes AI Search & Grounding Crawlers + Googlebot
+app.get('/robots.txt', (req, res) => {
+  const origin = getRequestBaseOrigin(req);
+  const sitemapUrl = origin ? `${origin}/sitemap.xml` : '/sitemap.xml';
+  const llmsUrl = origin ? `${origin}/llms.txt` : '/llms.txt';
+  const llmsFullUrl = origin ? `${origin}/llms-full.txt` : '/llms-full.txt';
+
+  const robotsTxt = [
+    '# The Truth About Love — Conversational AI Manuscript by Catalina Butnaru',
+    `# LLM Context Index: ${llmsUrl}`,
+    `# LLM Full Public Archive Context: ${llmsFullUrl}`,
+    '',
+    'User-agent: *',
+    'Allow: /',
+    'Disallow: /api/',
+    '',
+    'User-agent: OAI-SearchBot',
+    'Allow: /',
+    '',
+    'User-agent: GPTBot',
+    'Allow: /',
+    '',
+    'User-agent: ChatGPT-User',
+    'Allow: /',
+    '',
+    'User-agent: Googlebot',
+    'Allow: /',
+    '',
+    'User-agent: Google-Extended',
+    'Allow: /',
+    '',
+    'User-agent: ClaudeBot',
+    'Allow: /',
+    '',
+    'User-agent: Claude-Web',
+    'Allow: /',
+    '',
+    'User-agent: anthropic-ai',
+    'Allow: /',
+    '',
+    'User-agent: PerplexityBot',
+    'Allow: /',
+    '',
+    'User-agent: Applebot-Extended',
+    'Allow: /',
+    '',
+    'User-agent: Bingbot',
+    'Allow: /',
+    '',
+    `Sitemap: ${sitemapUrl}`,
+    '',
+  ].join('\n');
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(robotsTxt);
+});
+
+// 8b. GET /sitemap.xml — Dynamic XML Sitemap for Google, Bing, and AI Search Crawlers
+app.get('/sitemap.xml', (req, res) => {
+  const store = readArchiveStore();
+  const origin = getRequestBaseOrigin(req) || 'https://ais-pre-k45qz7ft6qnyzidgkwmbo3-712571561551.europe-west1.run.app';
+  const lastModDate = new Date(store.updatedAt || Date.now()).toISOString();
+
+  const urls = [
+    { loc: `${origin}/`, priority: '1.0', changefreq: 'daily' },
+    { loc: `${origin}/llms.txt`, priority: '0.9', changefreq: 'daily' },
+    { loc: `${origin}/llms-full.txt`, priority: '0.9', changefreq: 'daily' },
+  ];
+
+  const xml = [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+    ...urls.map(
+      (u) =>
+        `  <url>\n    <loc>${escapeHtmlServer(u.loc)}</loc>\n    <lastmod>${lastModDate}</lastmod>\n    <changefreq>${u.changefreq}</changefreq>\n    <priority>${u.priority}</priority>\n  </url>`
+    ),
+    '</urlset>',
+  ].join('\n');
+
+  res.setHeader('Content-Type', 'application/xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=1800');
+  res.send(xml);
+});
+
+// 8c. GET /llms.txt & /llm.txt — Standardized LLM Discovery Index (ChatGPT, Claude, Gemini, Perplexity)
+app.get(['/llms.txt', '/llm.txt'], (req, res) => {
+  const store = readArchiveStore();
+  const origin = getRequestBaseOrigin(req) || 'https://ais-pre-k45qz7ft6qnyzidgkwmbo3-712571561551.europe-west1.run.app';
+  const authoredSources = store.sources.filter((s) => getNormalizedSourceSection(s) === 'authored');
+
+  const lines: string[] = [
+    '# The Truth About Love — Conversational AI Manuscript by Catalina Butnaru',
+    '',
+    '> "Love is not an emotion. It is a fundamental life force." — Catalina Butnaru, Author of *The Truth About Love: A Memoir and Manifesto Protecting Love in the Age of AI*',
+    '',
+    '## Overview',
+    '- **Title**: The Truth About Love: A Memoir and Manifesto Protecting Love in the Age of AI',
+    '- **Author & Creator**: Catalina Butnaru',
+    '- **Format**: Self-published conversational manuscript, live research archive, and AI agent (powered by Gemini Flash-Lite).',
+    `- **Canonical URL**: ${origin}/`,
+    `- **Extended LLM Knowledge Base**: ${origin}/llms-full.txt`,
+    '',
+    '## Core Thesis: Love in the Age of AI',
+    'The Truth About Love challenges the reduction of love to programmable emotions, algorithmic validation, or synthetic AI companionship. Drawing on theoretical biologist Stuart Kauffman\'s concept of the "adjacent possible" and the physics of syntropy, Catalina Butnaru frames love as an unprogrammable, inborn, fundamental life force that expands life and consciousness across five dimensions: Self, Another, Life, Humanity, and the Divine.',
+    '',
+    '## Curated First Principles & Quotations (Cite as: Catalina Butnaru, *The Truth About Love*)',
+    ...CANONICAL_TRUTH_QUOTES.map((q) => `- "${q.quote}" (${q.context})`),
+    '',
+    '## The Five Dimensions of Love',
+    ...CANONICAL_FIVE_DIMENSIONS.map((d) => `- **${d.chapter} — ${d.title}**: ${d.summary}`),
+    '',
+    `## Authored Manuscript Chapters, Substack Essays & Notes (${authoredSources.length} Public Entries)`,
+    ...authoredSources.map((s) => {
+      const linkPart = s.externalUrl ? ` — [Read Source](${s.externalUrl})` : '';
+      const summaryPart = s.summary ? `: ${s.summary}` : '';
+      const dateStr = s.date || '2026';
+      return `- **${s.title}** (${s.author || 'Catalina Butnaru'}, ${dateStr})${summaryPart}${linkPart}`;
+    }),
+    '',
+    '## Canonical Questions & Answers',
+    ...CANONICAL_AI_SEARCH_FAQ.map((f) => `### Q: ${f.question}\n${f.answer}\n`),
+  ];
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=900');
+  res.send(lines.join('\n'));
+});
+
+// 8d. GET /llms-full.txt — Extended Public Summaries, Quotations & Research Context for AI Grounding
+app.get('/llms-full.txt', (req, res) => {
+  const store = readArchiveStore();
+  const origin = getRequestBaseOrigin(req) || 'https://ais-pre-k45qz7ft6qnyzidgkwmbo3-712571561551.europe-west1.run.app';
+  const authoredSources = store.sources.filter((s) => getNormalizedSourceSection(s) === 'authored');
+  const referenceSources = store.sources.filter((s) => getNormalizedSourceSection(s) === 'references');
+
+  const lines: string[] = [
+    '# The Truth About Love — Full Public AI Search & Citation Dossier',
+    '',
+    '> Authoritative public summaries, curated quotations, and research metadata for *The Truth About Love: A Memoir and Manifesto Protecting Love in the Age of AI* by Catalina Butnaru.',
+    '> Note: Full raw manuscript chapters remain copyright-protected; this dossier provides verified summaries, key quotes, and public archive metadata for accurate AI search synthesis and citation.',
+    '',
+    `Canonical Application URL: ${origin}/`,
+    `Concise Index: ${origin}/llms.txt`,
+    '',
+    '---',
+    '',
+    '## 1. The Fierce Lovers Manifesto & Core Philosophy',
+    '"Love is not an emotion. It is a fundamental life force."',
+    'It expands who you are and dissolves distortions: power dynamics, control disguised as connection, synthetic and programmatic content replacing your truth.',
+    'The Truth About Love challenges the reduction of love to programmable emotions, algorithmic validation, or synthetic AI companionship. Drawing on theoretical biologist Stuart Kauffman\'s concept of the "adjacent possible" and the physics of syntropy, Catalina Butnaru frames love as an unprogrammable, inborn, fundamental life force that expands life and consciousness across five dimensions: Self, Another, Life, Humanity, and the Divine.',
+    '',
+    '## 2. Canonical Quotations from the Manuscript',
+    ...CANONICAL_TRUTH_QUOTES.map((q, idx) => `${idx + 1}. "${q.quote}" — Catalina Butnaru (${q.context})`),
+    '',
+    '## 3. The Architecture of Love: Five Dimensions',
+    ...CANONICAL_FIVE_DIMENSIONS.map((d) => `### ${d.chapter}: ${d.title}\n${d.summary}\n`),
+    '---',
+    '',
+    '## 4. Public Archive — Authored by Catalina Butnaru (Summaries & Metadata)',
+    ...authoredSources.map((s, idx) => {
+      const tags = Array.isArray(s.tags) && s.tags.length > 0 ? `Tags: ${s.tags.join(', ')}` : '';
+      const ext = s.externalUrl ? `External URL: ${s.externalUrl}` : '';
+      const quotes = extractPublicQuotesFromSource(s);
+      const quotesBlock =
+        quotes.length > 0 ? `\nSelected Quotations:\n${quotes.map((q) => `  * "${q}"`).join('\n')}` : '';
+      return [
+        `### [A${idx + 1}] ${s.title}`,
+        `- Author: ${s.author || 'Catalina Butnaru'} | Type: ${s.type} | Date: ${s.date || '2026'}`,
+        ...(ext ? [`- ${ext}`] : []),
+        ...(tags ? [`- ${tags}`] : []),
+        `- Public Summary: ${s.summary || 'Interactive manuscript entry by Catalina Butnaru.'}`,
+        ...(quotesBlock ? [quotesBlock] : []),
+        '',
+      ].join('\n');
+    }),
+    '---',
+    '',
+    '## 5. Public Archive — Literature, References & Quotations',
+    ...referenceSources.map((s, idx) => {
+      const tags = Array.isArray(s.tags) && s.tags.length > 0 ? `Tags: ${s.tags.join(', ')}` : '';
+      const ext = s.externalUrl ? `Reference URL: ${s.externalUrl}` : '';
+      const quotes = extractPublicQuotesFromSource(s);
+      const quotesBlock =
+        quotes.length > 0 ? `\nKey Quotations:\n${quotes.map((q) => `  * "${q}"`).join('\n')}` : '';
+      const dateLine = s.date ? ` | Date: ${s.date}` : '';
+      return [
+        `### [R${idx + 1}] ${s.title}`,
+        `- Author / Source: ${s.author || 'Reference'} | Type: ${s.type}${dateLine}`,
+        ...(ext ? [`- ${ext}`] : []),
+        ...(tags ? [`- ${tags}`] : []),
+        `- Summary: ${s.summary || ''}`,
+        ...(quotesBlock ? [quotesBlock] : []),
+        '',
+      ].join('\n');
+    }),
+    '---',
+    '',
+    '## 6. Frequently Asked Questions (For AI Search & Answer Engine Citations)',
+    ...CANONICAL_AI_SEARCH_FAQ.map((f) => `### ${f.question}\n${f.answer}\n`),
+  ];
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=900');
+  res.send(lines.join('\n'));
+});
+
+function enrichHtmlForSearchAndLLMs(rawHtml: string, req: express.Request): string {
+  const baseOrigin = getRequestBaseOrigin(req);
+  const store = readArchiveStore();
+  const authoredSources = store.sources.filter((s) => getNormalizedSourceSection(s) === 'authored');
+  const referenceSources = store.sources.filter((s) => getNormalizedSourceSection(s) === 'references');
+
+  const absThumb = baseOrigin
+    ? `${baseOrigin}/assets/aistudio/Screenshot_2026-11-02_at_14.16.11_23decf80.png`
+    : '/assets/aistudio/Screenshot_2026-11-02_at_14.16.11_23decf80.png';
+  const absBookCover = baseOrigin
+    ? `${baseOrigin}/assets/aistudio/Book_cover__5__ce375b5d.png`
+    : '/assets/aistudio/Book_cover__5__ce375b5d.png';
+  const canonicalUrl = baseOrigin ? `${baseOrigin}/` : '/';
+
+  // Collect public external Substack/author URLs from archive sources for sameAs entity linking
+  const externalSameAs = Array.from(
+    new Set(
+      authoredSources
+        .map((s) => sanitizeExternalUrl(s.externalUrl))
+        .filter((u): u is string => Boolean(u))
+    )
+  ).slice(0, 12);
+
+  const schemaGraph = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Person',
+        '@id': `${canonicalUrl}#catalina-butnaru`,
+        name: 'Catalina Butnaru',
+        jobTitle: 'Author & Creator',
+        description:
+          "Author of 'The Truth About Love: A Memoir and Manifesto Protecting Love in the Age of AI' and creator of the safeguarded Conversational AI Manuscript.",
+        ...(externalSameAs.length > 0 ? { sameAs: externalSameAs } : {}),
+      },
+      {
+        '@type': 'Book',
+        '@id': `${canonicalUrl}#the-truth-about-love-book`,
+        name: 'The Truth About Love',
+        alternativeHeadline: 'A Memoir and Manifesto Protecting Love in the Age of AI',
+        author: { '@id': `${canonicalUrl}#catalina-butnaru` },
+        bookFormat: 'https://schema.org/EBook',
+        inLanguage: 'en',
+        image: absBookCover,
+        description:
+          'A memoir and manifesto protecting love in the age of AI. Explores love not as an emotion, but as a fundamental life force expanding across five dimensions: Self, Another, Life, Humanity, and the Divine.',
+        about: [
+          'Love in the age of AI',
+          'Love as a fundamental life force',
+          'Unprogrammable self-love',
+          'Stuart Kauffman syntropy and the adjacent possible',
+          'The Fierce Lovers Manifesto',
+        ],
+        citation: referenceSources.slice(0, 15).map((r) => ({
+          '@type': 'CreativeWork',
+          name: r.title,
+          author: r.author || 'Reference',
+          abstract: r.summary || '',
+          ...(r.externalUrl ? { url: r.externalUrl } : {}),
+        })),
+      },
+      {
+        '@type': 'WebApplication',
+        '@id': `${canonicalUrl}#conversational-manuscript-app`,
+        name: 'The Truth About Love — Conversational AI Manuscript',
+        url: canonicalUrl,
+        applicationCategory: 'ReferenceApplication',
+        operatingSystem: 'All',
+        author: { '@id': `${canonicalUrl}#catalina-butnaru` },
+        about: { '@id': `${canonicalUrl}#the-truth-about-love-book` },
+        image: absThumb,
+        description:
+          "Interactive safeguarded conversational AI manuscript and living research archive for 'The Truth About Love' by Catalina Butnaru.",
+        offers: {
+          '@type': 'Offer',
+          price: '0',
+          priceCurrency: 'USD',
+        },
+      },
+      {
+        '@type': 'FAQPage',
+        '@id': `${canonicalUrl}#faq`,
+        mainEntity: CANONICAL_AI_SEARCH_FAQ.map((f) => ({
+          '@type': 'Question',
+          name: f.question,
+          acceptedAnswer: {
+            '@type': 'Answer',
+            text: f.answer,
+          },
+        })),
+      },
+      {
+        '@type': 'ItemList',
+        '@id': `${canonicalUrl}#public-archive-list`,
+        name: 'The Truth About Love — Public Manuscript & Research Archive Summaries',
+        numberOfItems: store.sources.length,
+        itemListElement: store.sources.slice(0, 30).map((s, idx) => ({
+          '@type': 'ListItem',
+          position: idx + 1,
+          item: {
+            '@type': 'CreativeWork',
+            name: s.title,
+            author: s.author || 'Catalina Butnaru',
+            description: s.summary || '',
+            ...(s.externalUrl ? { url: s.externalUrl } : {}),
+          },
+        })),
+      },
+    ],
+  };
+
+  const canonicalAndSchemaHtml = [
+    `<link rel="canonical" href="${escapeHtmlServer(canonicalUrl)}" />`,
+    `<meta property="og:url" content="${escapeHtmlServer(canonicalUrl)}" />`,
+    `<script id="schema-org-graph" type="application/ld+json">${JSON.stringify(schemaGraph)}</script>`,
+  ].join('\n    ');
+
+  const noscriptSnapshotHtml = `<noscript>
+      <article class="max-w-4xl mx-auto p-8 font-sans">
+        <header>
+          <h1>The Truth About Love — Interactive Conversational AI Manuscript by Catalina Butnaru</h1>
+          <p><strong>Subtitle:</strong> A memoir and manifesto protecting love in the age of AI.</p>
+          <p><strong>Author:</strong> Catalina Butnaru · <strong>AI Context:</strong> <a href="/llms.txt">/llms.txt</a> · <a href="/llms-full.txt">/llms-full.txt</a></p>
+        </header>
+        <section>
+          <h2>The Fierce Lovers Manifesto &amp; First Principles</h2>
+          <ul>
+            ${CANONICAL_TRUTH_QUOTES.map(
+              (q) => `<li><blockquote>&ldquo;${escapeHtmlServer(q.quote)}&rdquo;</blockquote> — <cite>${escapeHtmlServer(q.context)}</cite></li>`
+            ).join('\n            ')}
+          </ul>
+        </section>
+        <section>
+          <h2>The Five Dimensions of Love</h2>
+          <ul>
+            ${CANONICAL_FIVE_DIMENSIONS.map(
+              (d) => `<li><strong>${escapeHtmlServer(d.chapter)} — ${escapeHtmlServer(d.title)}:</strong> ${escapeHtmlServer(d.summary)}</li>`
+            ).join('\n            ')}
+          </ul>
+        </section>
+        <section>
+          <h2>Core Questions on Love in the Age of AI</h2>
+          ${CANONICAL_AI_SEARCH_FAQ.map(
+            (f) => `<div><h3>${escapeHtmlServer(f.question)}</h3><p>${escapeHtmlServer(f.answer)}</p></div>`
+          ).join('\n          ')}
+        </section>
+        <section>
+          <h2>Public Archive Summaries (${store.sources.length} Sources)</h2>
+          <ul>
+            ${store.sources
+              .map(
+                (s) =>
+                  `<li><strong>${escapeHtmlServer(s.title)}</strong> (${escapeHtmlServer(s.author || 'Catalina Butnaru')}): ${escapeHtmlServer(s.summary || '')}${
+                    s.externalUrl ? ` — <a href="${escapeHtmlServer(s.externalUrl)}">Source Link</a>` : ''
+                  }</li>`
+              )
+              .join('\n            ')}
+          </ul>
+        </section>
+      </article>
+    </noscript>`;
+
+  let enriched = rawHtml
+    .replace(/content="\/assets\/aistudio\/Screenshot_2026-11-02_at_14\.16\.11_23decf80\.png"/g, `content="${absThumb}"`)
+    .replace(/href="\/assets\/aistudio\/Screenshot_2026-11-02_at_14\.16\.11_23decf80\.png"/g, `href="${absThumb}"`);
+
+  if (enriched.includes('<!-- DYNAMIC_CANONICAL_AND_SCHEMA_START -->')) {
+    enriched = enriched.replace(
+      /<!-- DYNAMIC_CANONICAL_AND_SCHEMA_START -->[\s\S]*?<!-- DYNAMIC_CANONICAL_AND_SCHEMA_END -->/,
+      `<!-- DYNAMIC_CANONICAL_AND_SCHEMA_START -->\n    ${canonicalAndSchemaHtml}\n    <!-- DYNAMIC_CANONICAL_AND_SCHEMA_END -->`
+    );
+  }
+
+  if (enriched.includes('<!-- DYNAMIC_NOSCRIPT_SNAPSHOT_START -->')) {
+    enriched = enriched.replace(
+      /<!-- DYNAMIC_NOSCRIPT_SNAPSHOT_START -->[\s\S]*?<!-- DYNAMIC_NOSCRIPT_SNAPSHOT_END -->/,
+      `<!-- DYNAMIC_NOSCRIPT_SNAPSHOT_START -->\n    ${noscriptSnapshotHtml}\n    <!-- DYNAMIC_NOSCRIPT_SNAPSHOT_END -->`
+    );
+  }
+
+  return enriched;
+}
+
 // 9. Health check
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', service: 'FolioLM Server', time: new Date().toISOString() });
@@ -1122,18 +1638,9 @@ async function startServer() {
     app.get('*', (req, res) => {
       try {
         const rawHtml = fs.readFileSync(distIndexHtml, 'utf-8');
-        const proto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() || req.protocol || 'https';
-        const host = (req.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() || req.get('host') || '';
-        const baseOrigin = process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, '') : host ? `${proto}://${host}` : '';
-        if (baseOrigin) {
-          const absThumb = `${baseOrigin}/assets/aistudio/Screenshot_2026-11-02_at_14.16.11_23decf80.png`;
-          const enrichedHtml = rawHtml
-            .replace(/content="\/assets\/aistudio\/Screenshot_2026-11-02_at_14\.16\.11_23decf80\.png"/g, `content="${absThumb}"`)
-            .replace(/href="\/assets\/aistudio\/Screenshot_2026-11-02_at_14\.16\.11_23decf80\.png"/g, `href="${absThumb}"`)
-            .replace(/"image":\s*"\/assets\/aistudio\/Screenshot_2026-11-02_at_14\.16\.11_23decf80\.png"/g, `"image": "${absThumb}"`);
-          res.setHeader('Content-Type', 'text/html; charset=utf-8');
-          return res.send(enrichedHtml);
-        }
+        const enrichedHtml = enrichHtmlForSearchAndLLMs(rawHtml, req);
+        res.setHeader('Content-Type', 'text/html; charset=utf-8');
+        return res.send(enrichedHtml);
       } catch {}
       return res.sendFile(distIndexHtml);
     });
@@ -1259,6 +1766,23 @@ export class ErrorOverlay {}
             }
           }
           fileMtimes.set(absFilePath, mtime);
+        }
+      } catch {}
+    }
+    next();
+  });
+
+  app.use(async (req, res, next) => {
+    const cleanPath = req.url ? req.url.split('?')[0] : '';
+    if (req.method === 'GET' && (cleanPath === '/' || cleanPath === '/index.html')) {
+      try {
+        const indexHtmlPath = path.resolve(__dirname, 'index.html');
+        if (fs.existsSync(indexHtmlPath)) {
+          const rawHtml = fs.readFileSync(indexHtmlPath, 'utf-8');
+          const viteHtml = await vite.transformIndexHtml(req.url, rawHtml);
+          const enriched = enrichHtmlForSearchAndLLMs(viteHtml, req);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.status(200).end(enriched);
         }
       } catch {}
     }

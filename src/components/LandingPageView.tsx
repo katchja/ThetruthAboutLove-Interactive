@@ -961,7 +961,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 onClick={onOpenArchive}
                 className="p-6 rounded-2xl bg-[#FFFFFF]/90 hover:bg-[#FFFFFF] text-left transition-all group space-y-1.5 cursor-pointer"
               >
-                <span className="text-2xl font-medium font-display text-[#0B0B0C] block group-hover:scale-105 transition-transform">
+                <span className="text-2xl font-medium font-display text-[#0B0B0C] text-left tabular-nums block group-hover:scale-105 transition-transform">
                   {cat.count}
                 </span>
                 <span className="text-xs sm:text-sm text-[#0B0B0C] font-sans font-medium block pt-1">
@@ -975,6 +975,165 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           </div>
         </div>
       </section>
+
+      {/* ========================================================================
+          SECTION 6: CORE QUESTIONS & CITATIONS (AI Search & Reader Reference)
+          ======================================================================== */}
+      <section
+        id="core-questions"
+        aria-labelledby="core-questions-heading"
+        className="max-w-5xl mx-auto px-4 sm:px-6 pt-28"
+      >
+        <div className="space-y-4 max-w-2xl mb-14">
+          <div className="flex items-center gap-2 text-xs text-[#5F6368] font-mono">
+            <span>The Truth About Love</span>
+            <span aria-hidden="true">·</span>
+            <span>Catalina Butnaru</span>
+            <span aria-hidden="true">·</span>
+            <span>Canonical Reference</span>
+          </div>
+          <h2
+            id="core-questions-heading"
+            className="text-2xl sm:text-3xl md:text-4xl font-display font-medium text-[#0B0B0C] tracking-tight"
+          >
+            Core Questions on Love in the Age of AI
+          </h2>
+          <p className="text-sm sm:text-base text-[#5F6368] leading-relaxed font-sans max-w-prose">
+            Direct syntheses from the manuscript and archive. Select any question to explore its primary sources and chapters inside the Conversational Manuscript.
+          </p>
+        </div>
+
+        <div className="divide-y divide-[#E8EAED] border-t border-b border-[#E8EAED]">
+          {[
+            {
+              index: '01',
+              question: 'What is The Truth About Love conversational AI manuscript by Catalina Butnaru?',
+              context: 'Conversational AI Manuscript · Overview',
+              answer:
+                'The Truth About Love is a self-published memoir, manifesto, and interactive conversational AI manuscript by Catalina Butnaru. It unites the book-in-the-making, author notes, Substack essays, and curated scientific and philosophical literature with a safeguarded Gemini Flash-Lite companion that responds strictly from the manuscript and archive.',
+            },
+            {
+              index: '02',
+              question: 'How does Catalina Butnaru define love in the age of AI?',
+              context: 'First Principle · The Fierce Lovers Manifesto',
+              answer:
+                'Catalina Butnaru defines love not as a fleeting or programmable emotion, but as a fundamental life force that expands what theoretical biologist Stuart Kauffman calls the adjacent possible. Protecting love in the age of AI means refusing synthetic intimacy, algorithmic validation, and outsourced thinking in favor of fierce, sovereign human connection.',
+            },
+            {
+              index: '03',
+              question: 'Why is love compared to syntropy rather than an emotion?',
+              context: 'Chapter 2 · The Purpose of Love',
+              answer:
+                'While entropy measures disorder and decay, syntropy describes the tendency of living systems toward coherence, organization, and creative expansion. Love operates like syntropy across five dimensions—Self, Another, Life, Humanity, and the Divine—continually expanding who we are.',
+            },
+            {
+              index: '04',
+              question: 'What is unprogrammable self-love in The Truth About Love?',
+              context: 'Chapter 3 · The Love of Self',
+              answer:
+                'Unprogrammable self-love is the recognition that genuine love of self cannot be installed like software through a 30-day program or mechanical routine. It is an inborn state of being unlocked through emotional self-regulation, self-mastery, and dissolving internal distortions of love.',
+            },
+            {
+              index: '05',
+              question: 'How does the safeguarded conversational manuscript protect intellectual property and reader wellbeing?',
+              context: 'Safeguarded Architecture · Fair Disclosure',
+              answer:
+                'The Conversational Manuscript Studio grounds every answer in verified summaries, curated quotations, and public research references while protecting raw copyrighted chapters. Built-in anti-projection guardrails ensure the AI serves transparently as an editorial research lens rather than simulating synthetic affection.',
+            },
+          ].map((item) => (
+            <article
+              key={item.index}
+              className="py-8 sm:py-10 flex flex-col lg:flex-row lg:items-start justify-between gap-6"
+            >
+              <div className="space-y-3 max-w-2xl">
+                <div className="flex items-center gap-2 text-xs font-mono text-[#5F6368]">
+                  <span className="tabular-nums text-[#0B0B0C] font-medium">{item.index}.</span>
+                  <span>{item.context}</span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-display font-medium text-[#0B0B0C] leading-snug">
+                  {item.question}
+                </h3>
+                <p className="text-sm sm:text-base text-[#202124] leading-relaxed font-sans max-w-prose">
+                  {item.answer}
+                </p>
+              </div>
+
+              <div className="shrink-0 pt-1 lg:pt-6">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const el = document.getElementById('conversational-archive');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    onSendMessage(item.question);
+                  }}
+                  className="px-5 py-2.5 rounded-full bg-[#F1F3F4] hover:bg-[#C83E0B] text-[#0B0B0C] hover:text-white text-xs font-sans font-medium transition-colors inline-flex items-center gap-2 cursor-pointer whitespace-nowrap"
+                >
+                  <span>Ask Manuscript</span>
+                  <ArrowRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </article>
+          ))}
+        </div>
+      </section>
+
+      {/* ========================================================================
+          EDITORIAL FOOTER & MACHINE-READABLE CITATION INDEX
+          ======================================================================== */}
+      <footer className="max-w-6xl mx-auto px-4 sm:px-6 pt-20">
+        <div className="pt-8 border-t border-[#E8EAED] flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-xs text-[#5F6368] font-sans">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="font-medium text-[#0B0B0C]">The Truth About Love</span>
+            <span aria-hidden="true">·</span>
+            <span>By Catalina Butnaru</span>
+            <span aria-hidden="true">·</span>
+            <span>Interactive Conversational Manuscript &amp; Archive</span>
+          </div>
+
+          <nav aria-label="Archive and Citation Resources" className="flex flex-wrap items-center gap-4">
+            <button
+              type="button"
+              onClick={onOpenArchive}
+              className="hover:text-[#0B0B0C] underline-offset-4 hover:underline transition-colors cursor-pointer whitespace-nowrap"
+            >
+              Interactive Archive ({sources.length})
+            </button>
+            {onOpenSafetyModal && (
+              <button
+                type="button"
+                onClick={onOpenSafetyModal}
+                className="hover:text-[#0B0B0C] underline-offset-4 hover:underline transition-colors cursor-pointer whitespace-nowrap"
+              >
+                Safety &amp; Fair Disclosure
+              </button>
+            )}
+            <a
+              href="/llms.txt"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono hover:text-[#0B0B0C] underline-offset-4 hover:underline transition-colors whitespace-nowrap"
+            >
+              llms.txt
+            </a>
+            <a
+              href="/llms-full.txt"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono hover:text-[#0B0B0C] underline-offset-4 hover:underline transition-colors whitespace-nowrap"
+            >
+              llms-full.txt
+            </a>
+            <a
+              href="/sitemap.xml"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono hover:text-[#0B0B0C] underline-offset-4 hover:underline transition-colors whitespace-nowrap"
+            >
+              Sitemap
+            </a>
+          </nav>
+        </div>
+      </footer>
     </div>
   );
 };
