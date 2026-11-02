@@ -1,14 +1,7 @@
 import React from 'react';
 import {
   Heart,
-  ShieldCheck,
   Settings,
-  Search,
-  Database,
-  Archive,
-  CloudUpload,
-  CheckCircle2,
-  RefreshCw,
 } from 'lucide-react';
 import { BookMetadata, AppView } from '../types';
 
@@ -41,9 +34,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenBookSettings,
   onToggleSemanticSearch,
   isSemanticSearchOpen,
-  onPublishToPublic,
-  syncStatus = 'idle',
-  syncedStats,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-[#FFFFFF]/95 backdrop-blur-md text-[#0B0B0C]">
@@ -72,97 +62,53 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
         </div>
 
-        {/* View mode switcher & Studio triggers */}
+        {/* View mode switcher */}
         <div className="hidden md:flex items-center p-1 bg-[#F1F3F4] rounded-xl text-xs gap-1">
           <button
             onClick={() => {
               setCurrentView('landing');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap cursor-pointer ${
               currentView === 'landing'
                 ? 'bg-[#FFFFFF] text-[#0B0B0C] font-semibold'
                 : 'text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
           >
-            <Heart className="w-3.5 h-3.5 text-current" />
             <span>The Manuscript</span>
           </button>
 
           <button
             onClick={() => setCurrentView('archive')}
-            className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap cursor-pointer ${
+            className={`px-3.5 py-1.5 rounded-lg font-medium transition-all whitespace-nowrap cursor-pointer ${
               currentView === 'archive'
                 ? 'bg-[#FFFFFF] text-[#0B0B0C] font-semibold'
                 : 'text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
           >
-            <Archive className="w-3.5 h-3.5 text-current" />
-            <span>Interactive Archive</span>
+            <span>Literature</span>
           </button>
-
         </div>
 
         {/* Action controls & Privacy mode */}
         <div className="flex items-center gap-2 shrink-0">
-          {/* Publish to Public button — visible only to the author in Google AI Studio Build mode */}
-          {onPublishToPublic && (
-            <button
-              onClick={onPublishToPublic}
-              disabled={syncStatus === 'syncing'}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap cursor-pointer ${
-                syncStatus === 'synced'
-                  ? 'bg-[#F1F3F4] text-[#0B0B0C] hover:bg-[#E8EAED]'
-                  : syncStatus === 'error'
-                  ? 'bg-[#202124] text-white hover:bg-[#0B0B0C]'
-                  : 'bg-[#C83E0B] text-white hover:bg-[#A93207]'
-              }`}
-              title={
-                syncedStats
-                  ? `Public Sync Active: ${syncedStats.photoCount} Photos & ${syncedStats.citationCount} Citations published to public link. Click to force publish.`
-                  : 'Publish all photos, edits, and citations from Studio to the public app'
-              }
-            >
-              {syncStatus === 'syncing' ? (
-                <>
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
-                  <span>Publishing...</span>
-                </>
-              ) : syncStatus === 'synced' ? (
-                <>
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#0B0B0C]" />
-                  <span className="hidden xl:inline font-mono">
-                    Published ({syncedStats?.photoCount ?? 0} Photos · {syncedStats?.citationCount ?? 0} Citations)
-                  </span>
-                  <span className="xl:hidden">Published</span>
-                </>
-              ) : (
-                <>
-                  <CloudUpload className="w-3.5 h-3.5" />
-                  <span>Publish to Public</span>
-                </>
-              )}
-            </button>
-          )}
-
           {/* Semantic Search toggle */}
           <button
             onClick={onToggleSemanticSearch}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
               isSemanticSearchOpen
                 ? 'bg-[#C83E0B] text-white'
                 : 'bg-[#F1F3F4] text-[#202124] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
             }`}
             title="Search the archive"
           >
-            <Search className="w-3.5 h-3.5 text-current" />
-            <span className="hidden lg:inline">Search</span>
+            <span>Search</span>
           </button>
 
           {/* Privacy */}
           <button
             onClick={() => setIsOfflineMode(!isOfflineMode)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
               isOfflineMode
                 ? 'bg-[#C83E0B] text-white font-semibold'
                 : 'bg-[#F1F3F4] text-[#202124] hover:text-[#0B0B0C] hover:bg-[#E8EAED]'
@@ -173,17 +119,7 @@ export const Header: React.FC<HeaderProps> = ({
                 : 'Hybrid Mode: Gemini answers with locally available passages.'
             }
           >
-            {isOfflineMode ? (
-              <>
-                <ShieldCheck className="w-3.5 h-3.5 text-white" />
-                <span className="hidden sm:inline">Offline Privacy</span>
-              </>
-            ) : (
-              <>
-                <Database className="w-3.5 h-3.5 text-[#5F6368]" />
-                <span className="hidden sm:inline">Local Search</span>
-              </>
-            )}
+            <span>{isOfflineMode ? 'Offline Privacy' : 'Local Search'}</span>
           </button>
 
           {/* Book settings — visible only to the author in Google AI Studio Build mode */}

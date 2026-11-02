@@ -299,12 +299,10 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                     className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-medium bg-[#C83E0B] hover:bg-[#A93207] text-white transition-colors cursor-pointer"
                     title="Return to Home: The Truth About Love"
                   >
-                    <ArrowLeft className="w-3.5 h-3.5" />
                     <span>The Truth About Love</span>
                   </button>
                 )}
-                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium bg-[#E8EAED] text-[#0B0B0C]">
-                  <Archive className="w-3.5 h-3.5 text-[#0B0B0C]" />
+                <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-mono font-medium bg-[#E8EAED] text-[#0B0B0C]">
                   MANUSCRIPT ARCHIVE &amp; CITATIONS
                 </span>
                 <span className="text-xs text-[#5F6368] font-mono">
@@ -393,7 +391,6 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
               onClick={() => scrollToSection('section-authored')}
               className="px-3.5 py-1.5 rounded-full bg-[#F1F3F4] hover:bg-[#E8EAED] text-[#0B0B0C] font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
             >
-              <BookMarked className="w-3.5 h-3.5 text-[#0B0B0C]" />
               <span>Authored by Catalina</span>
               <span className="text-[10px] font-mono text-[#5F6368]">({authoredSources.length})</span>
             </button>
@@ -403,7 +400,6 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
               onClick={() => scrollToSection('section-references')}
               className="px-3.5 py-1.5 rounded-full bg-[#F1F3F4] hover:bg-[#E8EAED] text-[#0B0B0C] font-medium flex items-center gap-1.5 transition-colors shrink-0 cursor-pointer"
             >
-              <Quote className="w-3.5 h-3.5 text-[#0B0B0C]" />
               <span>Literature, References &amp; Quotations</span>
               <span className="text-[10px] font-mono text-[#5F6368]">({referenceSources.length})</span>
             </button>
@@ -517,9 +513,8 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                       {/* Top type & privacy tags */}
                       <div className="flex items-center justify-between gap-2">
                         <span
-                          className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-mono font-medium ${config.bg} ${config.color}`}
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-mono font-medium ${config.bg} ${config.color}`}
                         >
-                          <IconComponent className="w-3.5 h-3.5" />
                           {config.label}
                         </span>
 
@@ -529,13 +524,11 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                               title="Protected Source: Full text preserved in local vector index"
                               className="inline-flex items-center text-[10px] font-mono font-medium text-[#5F6368] bg-[#E8EAED] px-2 py-0.5 rounded-full"
                             >
-                              <Lock className="w-2.5 h-2.5 mr-1" />
                               Protected
                             </span>
                           )}
                           {source.ocrData && (
                             <span className="inline-flex items-center text-[10px] font-mono font-medium text-[#0B0B0C] bg-[#E8EAED] px-2 py-0.5 rounded-full">
-                              <Sparkles className="w-2.5 h-2.5 mr-1" />
                               OCR Verified
                             </span>
                           )}
@@ -669,20 +662,18 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onEditSource(source)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FFFFFF] hover:bg-[#E8EAED] text-[#0B0B0C] text-[11px] font-medium transition-colors cursor-pointer"
+                                className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#FFFFFF] hover:bg-[#E8EAED] text-[#0B0B0C] text-[11px] font-medium transition-colors cursor-pointer"
                                 title="Edit Card Title, Passages, Author & All Fields"
                               >
-                                <Pencil className="w-3 h-3 text-[#0B0B0C]" />
                                 <span>Edit Card</span>
                               </button>
                             )}
 
                             {onAddPicturesToSource && (
                               <label
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FFFFFF] hover:bg-[#E8EAED] text-[#0B0B0C] text-[11px] font-medium cursor-pointer transition-colors"
+                                className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#FFFFFF] hover:bg-[#E8EAED] text-[#0B0B0C] text-[11px] font-medium cursor-pointer transition-colors"
                                 title="Add Picture(s) to this Card"
                               >
-                                <ImagePlus className="w-3 h-3 text-[#0B0B0C]" />
                                 <span>Add Picture</span>
                                 <input
                                   type="file"
@@ -698,10 +689,9 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onRemovePictureFromSource(source)}
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FFFFFF] hover:bg-[#E8EAED] text-[#5F6368] hover:text-[#0B0B0C] text-[11px] font-medium transition-colors cursor-pointer"
+                                className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#FFFFFF] hover:bg-[#E8EAED] text-[#5F6368] hover:text-[#0B0B0C] text-[11px] font-medium transition-colors cursor-pointer"
                                 title="Remove Picture from Card"
                               >
-                                <Trash2 className="w-3 h-3" />
                                 <span>Remove Picture</span>
                               </button>
                             )}
@@ -711,10 +701,9 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                             <button
                               type="button"
                               onClick={() => onDeleteSource(source.id)}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#FFFFFF] text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED] text-[11px] transition-colors cursor-pointer"
+                              className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#FFFFFF] text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED] text-[11px] transition-colors cursor-pointer"
                               title="Delete Card from Archive"
                             >
-                              <Trash2 className="w-3 h-3" />
                               <span>Delete</span>
                             </button>
                           )}
@@ -729,20 +718,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                             className="text-[#5F6368] hover:text-[#0B0B0C] font-medium flex items-center gap-1 cursor-pointer"
                             title="View complete source details & excerpts"
                           >
-                            <Eye className="w-3.5 h-3.5" />
                             <span>Inspect</span>
-                          </button>
-
-                          <button
-                            onClick={() => handleCopyCitation(source)}
-                            className="text-[#5F6368] hover:text-[#0B0B0C] p-1 cursor-pointer"
-                            title="Copy Citation"
-                          >
-                            {copiedCitationId === source.id ? (
-                              <Check className="w-3.5 h-3.5 text-[#0B0B0C]" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
                           </button>
                         </div>
 
@@ -752,7 +728,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                               href={safeExternalUrl}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-[11px] font-medium transition-all"
+                              className="inline-flex items-center px-3 py-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-[11px] font-medium transition-all"
                               title="Open publication link"
                             >
                               <span>
@@ -760,17 +736,15 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                                   ? 'Read on Substack'
                                   : 'View Link'}
                               </span>
-                              <ExternalLink className="w-3 h-3" />
                             </a>
                           )}
 
                           <button
                             onClick={() => onAskAboutSourceInStudio(source)}
-                            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-[11px] font-medium transition-colors cursor-pointer"
+                            className="inline-flex items-center px-3 py-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-[11px] font-medium transition-colors cursor-pointer"
                             title="Ask questions about this reference in the conversational window"
                           >
                             <span>Ask Manuscript</span>
-                            <ArrowRight className="w-3 h-3" />
                           </button>
                         </div>
                       </div>
@@ -932,29 +906,18 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                     <div className="flex flex-wrap items-center gap-1.5 shrink-0 self-end lg:self-center text-xs">
                       <button
                         onClick={() => onOpenSourceDetail(source)}
-                        className="px-3 py-1 rounded-full bg-[#E8EAED] text-[#202124] hover:text-[#0B0B0C] transition-colors flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1 rounded-full bg-[#E8EAED] text-[#202124] hover:text-[#0B0B0C] transition-colors flex items-center cursor-pointer"
                         title="Inspect quotation or reference details"
                       >
-                        <Eye className="w-3 h-3" />
                         <span>Inspect</span>
                       </button>
 
                       <button
                         onClick={() => handleCopyCitation(source)}
-                        className="px-3 py-1 rounded-full bg-[#E8EAED] text-[#202124] hover:text-[#0B0B0C] transition-colors flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1 rounded-full bg-[#E8EAED] text-[#202124] hover:text-[#0B0B0C] transition-colors flex items-center cursor-pointer"
                         title="Copy Citation"
                       >
-                        {copiedCitationId === source.id ? (
-                          <>
-                            <Check className="w-3 h-3 text-[#0B0B0C]" />
-                            <span className="text-[#0B0B0C]">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-3 h-3 text-[#5F6368]" />
-                            <span>Cite</span>
-                          </>
-                        )}
+                        <span>{copiedCitationId === source.id ? 'Copied' : 'Cite'}</span>
                       </button>
 
                       {safeExternalUrl && (
@@ -962,19 +925,17 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                           href={safeExternalUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="px-3 py-1 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white transition-colors flex items-center gap-1 font-medium"
+                          className="px-3 py-1 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white transition-colors flex items-center font-medium"
                         >
                           <span>Source</span>
-                          <ExternalLink className="w-3 h-3" />
                         </a>
                       )}
 
                       <button
                         onClick={() => onAskAboutSourceInStudio(source)}
-                        className="px-3 py-1 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                        className="px-3 py-1 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-[11px] font-medium transition-colors flex items-center cursor-pointer"
                       >
                         <span>Ask Manuscript</span>
-                        <ArrowRight className="w-3 h-3" />
                       </button>
 
                       {/* Author/Admin Studio Controls on every Quotation & Reference Card */}
@@ -982,20 +943,18 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onEditSource(source)}
-                          className="px-2.5 py-1 rounded-full bg-[#FFFFFF] text-[#0B0B0C] hover:bg-[#E8EAED] transition-colors flex items-center gap-1 font-medium cursor-pointer"
+                          className="px-2.5 py-1 rounded-full bg-[#FFFFFF] text-[#0B0B0C] hover:bg-[#E8EAED] transition-colors flex items-center font-medium cursor-pointer"
                           title="Edit Quotation, Title, Passages, Author & Fields"
                         >
-                          <Pencil className="w-3 h-3 text-[#0B0B0C]" />
                           <span>Edit</span>
                         </button>
                       )}
 
                       {isStudioAdmin && onAddPicturesToSource && (
                         <label
-                          className="px-2.5 py-1 rounded-full bg-[#FFFFFF] text-[#0B0B0C] hover:bg-[#E8EAED] transition-colors flex items-center gap-1 font-medium cursor-pointer"
+                          className="px-2.5 py-1 rounded-full bg-[#FFFFFF] text-[#0B0B0C] hover:bg-[#E8EAED] transition-colors flex items-center font-medium cursor-pointer"
                           title="Add Picture(s) to this Quotation / Reference Card"
                         >
-                          <ImagePlus className="w-3 h-3 text-[#0B0B0C]" />
                           <span>Picture</span>
                           <input
                             type="file"
@@ -1011,10 +970,10 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                         <button
                           type="button"
                           onClick={() => onDeleteSource(source.id)}
-                          className="px-2 py-1 rounded-full bg-[#FFFFFF] text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED] transition-colors flex items-center cursor-pointer"
+                          className="px-2.5 py-1 rounded-full bg-[#FFFFFF] text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#E8EAED] transition-colors flex items-center cursor-pointer"
                           title="Delete Card from Archive"
                         >
-                          <Trash2 className="w-3 h-3" />
+                          <span>Delete</span>
                         </button>
                       )}
                     </div>

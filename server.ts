@@ -459,7 +459,7 @@ app.post('/api/chat', chatRateLimiter, async (req, res) => {
     const safeBookTitle = clampString(bookTitle, 180, 'The Truth About Love');
     const safeAuthorName = clampString(authorName, 120, 'Catalina Butnaru');
 
-    const systemInstruction = `You are the interactive conversational research companion for "${safeBookTitle}" by ${safeAuthorName}, exploring love at the intersection of information theory, philosophy, and depth psychology.
+    const systemInstruction = `This is an interactive conversational research agent for "${safeBookTitle}" by ${safeAuthorName}, exploring love at the intersection of information theory, philosophy, and depth psychology.
 
 FAIR DISCLOSURE & WELLBEING BOUNDARIES (MANDATORY):
 - The manuscript reflects the author's personal perspective and should not be used for health and wellbeing advice or as a substitute for sound, expert counselling and advice.
