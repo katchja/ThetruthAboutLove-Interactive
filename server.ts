@@ -1118,9 +1118,24 @@ async function startServer() {
   const distIndexHtml = path.resolve(distPath, 'index.html');
 
   if (isProd && fs.existsSync(distIndexHtml)) {
-    app.use(express.static(distPath));
-    app.get('*', (_req, res) => {
-      res.sendFile(distIndexHtml);
+    app.use(express.static(distPath, { index: false }));
+    app.get('*', (req, res) => {
+      try {
+        const rawHtml = fs.readFileSync(distIndexHtml, 'utf-8');
+        const proto = (req.headers['x-forwarded-proto'] as string)?.split(',')[0]?.trim() || req.protocol || 'https';
+        const host = (req.headers['x-forwarded-host'] as string)?.split(',')[0]?.trim() || req.get('host') || '';
+        const baseOrigin = process.env.APP_URL ? process.env.APP_URL.replace(/\/+$/, '') : host ? `${proto}://${host}` : '';
+        if (baseOrigin) {
+          const absThumb = `${baseOrigin}/assets/aistudio/Screenshot_2026-11-02_at_14.16.11_23decf80.png`;
+          const enrichedHtml = rawHtml
+            .replace(/content="\/assets\/aistudio\/Screenshot_2026-11-02_at_14\.16\.11_23decf80\.png"/g, `content="${absThumb}"`)
+            .replace(/href="\/assets\/aistudio\/Screenshot_2026-11-02_at_14\.16\.11_23decf80\.png"/g, `href="${absThumb}"`)
+            .replace(/"image":\s*"\/assets\/aistudio\/Screenshot_2026-11-02_at_14\.16\.11_23decf80\.png"/g, `"image": "${absThumb}"`);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.send(enrichedHtml);
+        }
+      } catch {}
+      return res.sendFile(distIndexHtml);
     });
     server.listen(port, '0.0.0.0', () => {
       console.log(`FolioLM production server listening on http://0.0.0.0:${port}`);
