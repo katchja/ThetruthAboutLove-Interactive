@@ -378,4 +378,33 @@ Defending the human mind is the defining love story of our era. It requires cogn
     isProtected: false,
     createdAt: SEED_BASE_TIME - 86400000 * 1,
   },
+  {
+    id: 'src-nasr-garden-of-truth',
+    title: "The Garden of Truth: The Vision and Promise of Sufism, Islam's Mystical Tradition",
+    type: 'book',
+    section: 'references',
+    author: 'Seyyed Hossein Nasr',
+    year: '2007 / 2008',
+    reference: 'HarperOne / HarperSanFrancisco (HarperCollins) · ISBN-13: 978-0061625992 (Paperback)',
+    summary: 'Seyyed Hossein Nasr explores Sufism as a living spiritual tradition rooted in the twin gateways of Sacred Knowledge (Ma\'rifah) and Divine Love (Mahabbah)—framing Truth (Al-Haqq) and Love not as mere sentiment, but as the ontological reality and liberating fire at the center of human consciousness.',
+    content: `The Garden of Truth: The Vision and Promise of Sufism, Islam's Mystical Tradition
+• Author: Seyyed Hossein Nasr
+• Publisher: HarperOne / HarperSanFrancisco (HarperCollins)
+• Publication Year: 2007 (Hardcover) / 2008 (Paperback)
+• ISBN-13: 978-0061625992 (Paperback)
+
+Core Philosophical & Mystical Notes (Referenced in Chapter 7: The Love of the Divine):
+1. Truth (Al-Haqq) & Self-Knowledge:
+Nasr presents Truth not as an abstract mental construct, but as Ultimate Reality itself—an illuminating presence that liberates the soul from illusion and alienation. True knowledge begins inward ("Whosoever knows his self, knows his Lord"), echoing the manuscript's thesis that authentic self-love and self-knowledge are inborn and unprogrammable.
+
+2. Love (Mahabbah) as Ontological Force:
+Beyond transactional fear or reward, Sufism places Divine Love at the summit of human realization—described by Nasr as "the fire that attracts and consumes, the peace that calms and liberates." Love is the unifying ontological current that dissolves egoic separation and gathers all loves—of self, another, humanity, and life—into Oneness.
+
+3. Antidote to Modern Alienation:
+Addressing the existential crisis of modern secularism and mechanistic reductionism, Nasr articulates what it means to be fully human: a conscious bridge between the earthly and the Sacred, grounded in ethical goodness, beauty, and interior sovereignty.`,
+    externalUrl: 'https://openlibrary.org/isbn/9780061625992',
+    tags: ['Divine Love', 'Sufism', 'Truth', 'Self-Knowledge', 'Mysticism', 'Ontology of Love'],
+    isProtected: false,
+    createdAt: SEED_BASE_TIME - 86400000 * 0.5,
+  },
 ];

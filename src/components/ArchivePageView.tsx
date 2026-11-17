@@ -24,6 +24,7 @@ import {
   CloudUpload,
   CheckCircle2,
   RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Source,
@@ -35,6 +36,7 @@ import {
 } from '../types';
 import { isPurgedArchiveSource } from '../utils/vectorStore';
 import { sanitizeExternalUrl } from '../utils/security';
+import { readUploadedImageFileAsDataUrl } from '../utils/imagePipeline';
 import { Labs3DBlobShape, LabsFlowerShape } from './LabsFloatingShapes';
 
 interface ArchivePageViewProps {
@@ -57,6 +59,10 @@ interface ArchivePageViewProps {
     photoCount: number;
     citationCount: number;
   };
+  cloudAuthState?: 'checking' | 'connected' | 'unauthenticated';
+  onConnectCloudAuthor?: () => Promise<unknown> | void;
+  pendingCloudCount?: number;
+  syncErrorMessage?: string | null;
 }
 
 const TYPE_CONFIG: Record<
@@ -123,12 +129,16 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
   onPublishToPublic,
   syncStatus = 'idle',
   syncedStats,
+  cloudAuthState = 'checking',
+  onConnectCloudAuthor,
+  pendingCloudCount = 0,
+  syncErrorMessage,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<string>('all');
   const [copiedCitationId, setCopiedCitationId] = useState<string | null>(null);
 
-  const handleQuickPictureUpload = (
+  const handleQuickPictureUpload = async (
     source: Source,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
@@ -136,28 +146,26 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const readers: Promise<string>[] = Array.from(files)
-      .filter((f) => f.type.startsWith('image/'))
-      .map(
-        (file) =>
-          new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => resolve((ev.target?.result as string) || '');
-            reader.onerror = () => resolve('');
-            reader.readAsDataURL(file);
-          })
-      );
-
-    Promise.all(readers)
-      .then((dataUrls) => {
-        const valid = dataUrls.filter(Boolean);
-        if (valid.length > 0) {
-          Promise.resolve(onAddPicturesToSource(source, valid)).catch(() => {});
-        }
-      })
-      .catch(() => {});
-
+    const selected = Array.from(files).filter(
+      (f) =>
+        f.type.startsWith('image/') ||
+        /\.(avif|heic|heif|webp|png|jpe?g|gif|bmp|svg)$/i.test(f.name)
+    );
     e.target.value = '';
+    if (selected.length === 0) return;
+
+    try {
+      const decoded: string[] = [];
+      for (const file of selected) {
+        const dataUrl = await readUploadedImageFileAsDataUrl(file);
+        if (dataUrl) decoded.push(dataUrl);
+      }
+      if (decoded.length > 0) {
+        await Promise.resolve(onAddPicturesToSource(source, decoded));
+      }
+    } catch (err) {
+      console.warn('Quick picture decode warning:', err);
+    }
   };
 
   // Filter sources based on search and type
@@ -320,7 +328,22 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
 
             {/* Actions */}
             <div className="flex flex-wrap items-center gap-2.5 shrink-0">
-              {isStudioAdmin && onPublishToPublic && (
+              {isStudioAdmin && cloudAuthState === 'unauthenticated' && onConnectCloudAuthor && (
+                <button
+                  type="button"
+                  onClick={() => onConnectCloudAuthor()}
+                  className="px-4 py-2.5 rounded-full text-xs font-medium bg-[#0B0B0C] hover:bg-[#202124] text-white transition-all flex items-center gap-1.5 cursor-pointer"
+                  title="Connect your verified Google author account so every chapter edit and cover replacement auto-saves permanently to Cloud Firestore"
+                >
+                  <CloudUpload className="w-3.5 h-3.5 text-white" />
+                  <span>
+                    Connect Cloud Auto-Save
+                    {pendingCloudCount > 0 ? ` (${pendingCloudCount} pending)` : ''}
+                  </span>
+                </button>
+              )}
+
+              {isStudioAdmin && cloudAuthState === 'connected' && onPublishToPublic && (
                 <button
                   type="button"
                   onClick={() => onPublishToPublic()}
@@ -329,27 +352,35 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                     syncStatus === 'synced'
                       ? 'bg-[#F1F3F4] text-[#0B0B0C] hover:bg-[#E8EAED]'
                       : syncStatus === 'error'
-                      ? 'bg-[#202124] text-white'
+                      ? 'bg-[#C83E0B] text-white hover:bg-[#A93207]'
                       : 'bg-[#C83E0B] text-white hover:bg-[#A93207]'
                   }`}
-                  title="Sync all Studio photos, cards, and Bibliographic & Citation Index entries to the public link"
+                  title={
+                    syncErrorMessage ||
+                    'Auto-saved to Cloud Firestore and mirrored to the public website'
+                  }
                 >
                   {syncStatus === 'syncing' ? (
                     <>
                       <RefreshCw className="w-3.5 h-3.5 animate-spin text-white" />
-                      <span>Publishing to Public...</span>
+                      <span>Saving to Cloud...</span>
+                    </>
+                  ) : syncStatus === 'error' ? (
+                    <>
+                      <AlertCircle className="w-3.5 h-3.5 text-white" />
+                      <span>Cloud Save Error — Retry</span>
                     </>
                   ) : syncStatus === 'synced' ? (
                     <>
                       <CheckCircle2 className="w-3.5 h-3.5 text-[#0B0B0C]" />
                       <span className="font-mono">
-                        Published ({syncedStats?.photoCount ?? 0} Photos · {syncedStats?.citationCount ?? referenceSources.length} Citations)
+                        Saved to Cloud ({syncedStats?.photoCount ?? 0} Covers · {syncedStats?.citationCount ?? referenceSources.length} Citations)
                       </span>
                     </>
                   ) : (
                     <>
                       <CloudUpload className="w-3.5 h-3.5 text-white" />
-                      <span>Publish to Public</span>
+                      <span>Sync Cloud Archive</span>
                     </>
                   )}
                 </button>
@@ -669,13 +700,16 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                             {onAddPicturesToSource && (
                               <label
                                 className="inline-flex items-center px-2.5 py-1 rounded-full bg-[#FFFFFF] hover:bg-[#E8EAED] text-[#0B0B0C] text-[11px] font-medium cursor-pointer transition-colors"
-                                title="Add Picture(s) to this Card"
+                                title={
+                                  primaryImage
+                                    ? 'Replace cover picture and permanently purge old cover asset'
+                                    : 'Add cover picture to this chapter card'
+                                }
                               >
-                                <span>Add Picture</span>
+                                <span>{primaryImage ? 'Replace Cover' : 'Add Cover'}</span>
                                 <input
                                   type="file"
-                                  accept="image/*"
-                                  multiple
+                                  accept="image/*,image/avif,image/heic,image/heif,.avif,.heic,.heif"
                                   onChange={(e) => handleQuickPictureUpload(source, e)}
                                   className="hidden"
                                 />
@@ -715,7 +749,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                             className="text-[#5F6368] hover:text-[#0B0B0C] font-medium flex items-center gap-1 cursor-pointer"
                             title="View complete source details & excerpts"
                           >
-                            <span>Inspect</span>
+                            <span>See notes</span>
                           </button>
                         </div>
 
@@ -850,7 +884,7 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                           onContextMenu={(e) => e.preventDefault()}
                           onDragStart={(e) => e.preventDefault()}
                           className="w-16 h-16 rounded-xl overflow-hidden bg-[#FFFFFF] shrink-0 cursor-pointer relative group/refimg select-none"
-                          title="Click to inspect attached picture"
+                          title="See picture"
                         >
                           <img
                             src={refImages[0]}
@@ -901,9 +935,9 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                       <button
                         onClick={() => onOpenSourceDetail(source)}
                         className="px-3 py-1 rounded-full bg-[#E8EAED] text-[#202124] hover:text-[#0B0B0C] transition-colors flex items-center cursor-pointer"
-                        title="Inspect quotation or reference details"
+                        title="See reference details"
                       >
-                        <span>Inspect</span>
+                        <span>See notes</span>
                       </button>
 
                       <button
@@ -947,13 +981,16 @@ export const ArchivePageView: React.FC<ArchivePageViewProps> = ({
                       {isStudioAdmin && onAddPicturesToSource && (
                         <label
                           className="px-2.5 py-1 rounded-full bg-[#FFFFFF] text-[#0B0B0C] hover:bg-[#E8EAED] transition-colors flex items-center font-medium cursor-pointer"
-                          title="Add Picture(s) to this Quotation / Reference Card"
+                          title={
+                            refImages.length > 0
+                              ? 'Replace cover picture and purge old asset'
+                              : 'Add cover picture to this reference entry'
+                          }
                         >
-                          <span>Picture</span>
+                          <span>{refImages.length > 0 ? 'Replace Cover' : 'Add Cover'}</span>
                           <input
                             type="file"
-                            accept="image/*"
-                            multiple
+                            accept="image/*,image/avif,image/heic,image/heif,.avif,.heic,.heif"
                             onChange={(e) => handleQuickPictureUpload(source, e)}
                             className="hidden"
                           />

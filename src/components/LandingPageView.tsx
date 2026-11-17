@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   BookOpen, 
   Sparkles, 
@@ -92,6 +92,16 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   const [quickQuery, setQuickQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeQuoteIndex, setActiveQuoteIndex] = useState(0);
+  const composerRef = useRef<HTMLTextAreaElement | null>(null);
+  const liveThreadRef = useRef<HTMLDivElement | null>(null);
+  const prevMessageCountRef = useRef<number>(messages.length);
+
+  useEffect(() => {
+    if (messages.length > prevMessageCountRef.current && liveThreadRef.current) {
+      liveThreadRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+    prevMessageCountRef.current = messages.length;
+  }, [messages.length]);
 
   // Combine curated manuscript truths with dynamic Archive citations & quotes
   const carouselQuotes = useMemo<TruthQuoteItem[]>(() => {
@@ -142,13 +152,19 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
   const currentTruth = carouselQuotes[activeQuoteIndex % carouselQuotes.length] || CURATED_MANUSCRIPT_TRUTHS[0];
 
-  const handleWhyShouldICare = async (quoteText: string) => {
-    const formattedPrompt = `"${quoteText}"Chat with Manuscript`;
-    setQuickQuery(formattedPrompt);
-    const archiveSection = document.getElementById('conversational-archive');
-    if (archiveSection) {
-      archiveSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const scrollToComposerAndThread = () => {
+    const target =
+      liveThreadRef.current ||
+      document.getElementById('manuscript-composer-card') ||
+      document.getElementById('conversational-archive');
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
+  };
+
+  const handleWhyShouldICare = async (quoteText: string) => {
+    const formattedPrompt = `Explore this truth from the manuscript: "${quoteText}"`;
+    scrollToComposerAndThread();
     if (!isChatLoading) {
       setQuickQuery('');
       await onSendMessage(formattedPrompt);
@@ -157,7 +173,11 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
   const handleQuickSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!quickQuery.trim() || isChatLoading) return;
+    if (isChatLoading) return;
+    if (!quickQuery.trim()) {
+      composerRef.current?.focus();
+      return;
+    }
     const q = quickQuery.trim();
     setQuickQuery('');
     await onSendMessage(q);
@@ -337,13 +357,21 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           <div className="p-8 sm:p-14 space-y-10 sm:space-y-12 bg-[#F8F9FA]">
             {/* Prominent Multi-line Composer Console */}
             <form
+              id="manuscript-composer-card"
               onSubmit={handleQuickSubmit}
-              className="rounded-3xl bg-[#FFFFFF] p-6 sm:p-8 transition-all"
+              onClick={(e) => {
+                const target = e.target as HTMLElement;
+                if (!target.closest('button, a, textarea')) {
+                  composerRef.current?.focus();
+                }
+              }}
+              className="rounded-3xl bg-[#FFFFFF] p-6 sm:p-8 transition-all cursor-text"
             >
               <label htmlFor="manuscript-composer" className="sr-only">
                 Ask the Manuscript
               </label>
               <textarea
+                ref={composerRef}
                 id="manuscript-composer"
                 rows={3}
                 value={quickQuery}
@@ -362,7 +390,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 className="w-full bg-transparent text-base sm:text-lg text-[#0B0B0C] placeholder-[#80868B] focus:outline-none resize-none leading-relaxed font-sans"
               />
 
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-5 mt-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-5 mt-3 cursor-default">
                 <div className="flex items-center gap-2.5 text-xs text-[#5F6368] flex-wrap font-sans">
                   <span className="hidden md:inline text-[#5F6368]">
                     Press <kbd className="font-mono px-1.5 py-0.5 rounded bg-[#F1F3F4] text-[#202124] text-[11px]">Enter</kbd> to ask, <kbd className="font-mono px-1.5 py-0.5 rounded bg-[#F1F3F4] text-[#202124] text-[11px]">Shift+Enter</kbd> for new line
@@ -381,8 +409,12 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   )}
                   <button
                     type="submit"
-                    disabled={!quickQuery.trim() || isChatLoading}
-                    className="px-7 py-3.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] disabled:opacity-50 disabled:hover:bg-[#C83E0B] text-white font-medium text-sm transition-all flex items-center gap-2.5 cursor-pointer"
+                    disabled={isChatLoading}
+                    className={`px-7 py-3.5 rounded-full text-white font-medium text-sm transition-all flex items-center gap-2.5 cursor-pointer ${
+                      quickQuery.trim()
+                        ? 'bg-[#C83E0B] hover:bg-[#A93207]'
+                        : 'bg-[#C83E0B]/70 hover:bg-[#C83E0B]'
+                    } disabled:opacity-60 disabled:cursor-wait`}
                   >
                     {isChatLoading ? (
                       <>
@@ -400,7 +432,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               </div>
 
               {/* Subtle Inline Fair AI Disclosure & Wellbeing Notice */}
-              <div className="mt-5 pt-4 border-t border-[#E8EAED] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] sm:text-xs text-[#5F6368] leading-relaxed font-sans">
+              <div className="mt-5 pt-4 border-t border-[#E8EAED] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-[11px] sm:text-xs text-[#5F6368] leading-relaxed font-sans cursor-default">
                 <p className="max-w-3xl">
                   <strong className="font-medium text-[#202124]">Fair Disclosure:</strong>{' '}
                   {FAIR_DISCLOSURE_SHORT_TEXT}
@@ -418,58 +450,34 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               </div>
             </form>
 
-            {/* Quick Inquiry Bar (always accessible for one-click exploration) */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-mono uppercase tracking-wider font-medium text-[#5F6368]">
-                  Manuscript prompts
-                </span>
-              </div>
-              <div className="flex flex-wrap items-center gap-3">
-                {sampleQuestions.map((q, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    disabled={isChatLoading}
-                    onClick={async () => {
-                      setQuickQuery('');
-                      await onSendMessage(q);
-                    }}
-                    className="px-4 py-2.5 rounded-full bg-[#FFFFFF] hover:bg-[#C83E0B] text-[#202124] hover:text-white text-xs sm:text-sm font-sans font-medium transition-all flex items-center gap-2 text-left cursor-pointer group"
-                  >
-                    <span>{q}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* ==============================================================
-                CONVERSATION STAGE: Live Thread
+                CONVERSATION STAGE: Live Thread (Immediately below Composer)
                 ============================================================== */}
-            {messages.length > 0 && (
-              <div className="space-y-6 pt-6">
+            {(messages.length > 0 || isChatLoading) && (
+              <div ref={liveThreadRef} className="space-y-6 pt-2 scroll-mt-24">
                 <div className="flex items-center justify-between flex-wrap gap-3 text-xs text-[#5F6368]">
                   <div className="flex items-center gap-3">
                     <span className="font-medium text-sm text-[#0B0B0C] font-display">
-                      Chat({messages.length} {messages.length === 1 ? 'exchange' : 'exchanges'})
+                      Chat ({messages.length} {messages.length === 1 ? 'exchange' : 'exchanges'})
                     </span>
                     <span>·</span>
                     <span className="text-[#5F6368] font-sans">
-                      Click to open note
+                      Click any citation to open source notes
                     </span>
                   </div>
-                  {onClearChat && (
+                  {onClearChat && messages.length > 0 && (
                     <button
+                      type="button"
                       onClick={onClearChat}
                       className="text-xs font-medium text-white bg-[#C83E0B] hover:bg-[#A93207] px-3.5 py-1.5 rounded-full flex items-center gap-1.5 cursor-pointer transition-colors"
                     >
                       <RotateCcw className="w-3 h-3" />
-                      <span>Go back</span>
+                      <span>Clear chat</span>
                     </button>
                   )}
                 </div>
 
-                <div className="space-y-8 min-h-[460px] max-h-[740px] overflow-y-auto p-6 sm:p-10 rounded-3xl bg-[#F1F3F4]">
+                <div className="space-y-8 max-h-[740px] overflow-y-auto p-6 sm:p-10 rounded-3xl bg-[#F1F3F4]">
                   {messages.map((message) => (
                     <div
                       key={message.id}
@@ -548,8 +556,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                               <button
                                 type="button"
                                 onClick={() => {
-                                  const el = document.getElementById('manuscript-composer');
-                                  if (el) el.focus();
+                                  composerRef.current?.focus();
+                                  document
+                                    .getElementById('manuscript-composer-card')
+                                    ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
                                 }}
                                 className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full text-xs font-medium text-[#5F6368] hover:text-[#0B0B0C] hover:bg-[#F1F3F4] transition-colors cursor-pointer"
                               >
@@ -558,6 +568,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                             </div>
 
                             <button
+                              type="button"
                               onClick={() => handleCopy(message.id, message.content)}
                               className="inline-flex items-center gap-1.5 px-3 py-2 rounded-full hover:bg-[#F1F3F4] text-[#5F6368] hover:text-[#0B0B0C] transition-colors cursor-pointer"
                               title="Copy response"
@@ -599,6 +610,32 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 </div>
               </div>
             )}
+
+            {/* Quick Inquiry Bar (always accessible for one-click exploration) */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-mono uppercase tracking-wider font-medium text-[#5F6368]">
+                  Manuscript prompts
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                {sampleQuestions.map((q, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    disabled={isChatLoading}
+                    onClick={async () => {
+                      setQuickQuery('');
+                      scrollToComposerAndThread();
+                      await onSendMessage(q);
+                    }}
+                    className="px-4 py-2.5 rounded-full bg-[#FFFFFF] hover:bg-[#C83E0B] text-[#202124] hover:text-white text-xs sm:text-sm font-sans font-medium transition-all flex items-center gap-2 text-left cursor-pointer group disabled:opacity-50"
+                  >
+                    <span>{q}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -650,6 +687,11 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
               <div className="flex flex-wrap items-center gap-4 pt-3">
                 <a
                   href="#conversational-archive"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    scrollToComposerAndThread();
+                    window.setTimeout(() => composerRef.current?.focus({ preventScroll: true }), 250);
+                  }}
                   className="px-7 py-4 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white font-sans font-medium text-sm transition-all flex items-center gap-2.5"
                 >
                   <span>Ask Manuscript</span>
@@ -874,9 +916,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
                 {isFeatured ? (
                   <button
+                    type="button"
                     onClick={() => {
-                      const el = document.getElementById('conversational-archive');
-                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      scrollToComposerAndThread();
                       onSendMessage(
                         "Guide me through the practical exercises to explore the truth of my love life, develop my love intelligence, and define my love standards."
                       );
@@ -888,9 +930,9 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   </button>
                 ) : (
                   <button
+                    type="button"
                     onClick={() => {
-                      const el = document.getElementById('conversational-archive');
-                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      scrollToComposerAndThread();
                       onSendMessage(
                         `Tell me about ${card.title} (${card.subtitle}) and the insights from ${card.tag}.`
                       );
@@ -1062,8 +1104,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 <button
                   type="button"
                   onClick={() => {
-                    const el = document.getElementById('conversational-archive');
-                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    scrollToComposerAndThread();
                     onSendMessage(item.question);
                   }}
                   className="px-5 py-2.5 rounded-full bg-[#F1F3F4] hover:bg-[#C83E0B] text-[#0B0B0C] hover:text-white text-xs font-sans font-medium transition-colors inline-flex items-center gap-2 cursor-pointer whitespace-nowrap"

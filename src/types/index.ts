@@ -19,6 +19,8 @@ export interface Source {
   externalUrl?: string; // External buy or read link for readers
   imageUrl?: string; // Archival scan or manuscript image preview
   images?: string[]; // Additional or multiple pictures attached to the card
+  coverAssetId?: string; // Content-addressed Firestore asset ID for primary cover
+  assetIds?: string[]; // Content-addressed Firestore asset IDs attached to this card
   ocrData?: {
     rawTranscription: string;
     detectedPage?: string;

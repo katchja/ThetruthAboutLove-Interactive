@@ -1,4 +1,6 @@
 import { Source, VectorChunk, SearchResult, getSourceImages, getSourceSection } from '../types';
+import { extractAssetIdFromUrl } from './imagePipeline';
+import { getLocalDeletedAssetIds, recordLocalDeletedAssetId } from './cloudArchive';
 
 const DB_NAME = 'TruthAboutLove_LocalArchive_v6';
 const DB_VERSION = 1;
@@ -395,6 +397,27 @@ export function clearDeletedSourcesRegistry(): void {
   } catch {}
 }
 
+export function syncDeletedSourceIdsFromServer(ids: string[]): void {
+  if (typeof window === 'undefined' || !Array.isArray(ids) || ids.length === 0) return;
+  try {
+    const current = getDeletedSourceIds();
+    for (const id of ids) {
+      if (id) current.add(id);
+    }
+    window.localStorage.setItem(
+      DELETED_SOURCES_STORAGE_KEY,
+      JSON.stringify(Array.from(current))
+    );
+  } catch {}
+}
+
+export function syncDeletedAssetIdsFromServer(assetIds: string[]): void {
+  if (typeof window === 'undefined' || !Array.isArray(assetIds) || assetIds.length === 0) return;
+  for (const aid of assetIds) {
+    if (aid) recordLocalDeletedAssetId(aid);
+  }
+}
+
 export function isPurgedArchiveSource(source: Partial<Source>): boolean {
   if (source.id && getDeletedSourceIds().has(source.id)) {
     return true;
@@ -482,6 +505,7 @@ export async function loadArchiveFromDB(): Promise<{ sources: Source[]; chunks: 
     });
 
     const deletedSet = getDeletedSourceIds();
+    const deletedAssetSet = getLocalDeletedAssetIds();
     const purgedIds = new Set<string>(deletedSet);
     const byId = new Map<string, Source>();
 
@@ -490,11 +514,14 @@ export async function loadArchiveFromDB(): Promise<{ sources: Source[]; chunks: 
         purgedIds.add(source.id);
         byId.delete(source.id);
       } else {
-        const imgs = getSourceImages(source);
+        const imgs = getSourceImages(source).filter((imgUrl) => {
+          const aid = extractAssetIdFromUrl(imgUrl);
+          return !(aid && deletedAssetSet.has(aid));
+        });
         byId.set(source.id, {
           ...source,
           section: getSourceSection(source),
-          imageUrl: imgs[0] || source.imageUrl,
+          imageUrl: imgs[0] || undefined,
           images: imgs.length > 0 ? imgs : undefined,
         });
       }

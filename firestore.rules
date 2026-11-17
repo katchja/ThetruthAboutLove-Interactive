@@ -1,0 +1,346 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Default-Deny Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // Hardened Global Primitives
+    // =========================================================================
+    function isValidId(id) {
+      return id is string
+        && id.size() >= 1
+        && id.size() <= 128
+        && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Bootstrapped Verified Author Gate (Catalina Butnaru)
+    // Enforces email_verified == true to defeat unverified email spoofing
+    function isVerifiedAuthor() {
+      return isSignedIn()
+        && request.auth.token.email_verified == true
+        && request.auth.token.email is string
+        && request.auth.token.email.size() >= 3
+        && request.auth.token.email.size() <= 160
+        && request.auth.token.email == 'butnaru.catalina@gmail.com';
+    }
+
+    // =========================================================================
+    // Entity Validation Blueprints (Synchronized with firebase-blueprint.json)
+    // =========================================================================
+    function isValidArchiveSource(data, sourceId) {
+      return data.keys().hasAll([
+          'id', 'title', 'type', 'section', 'summary', 'tags',
+          'isProtected', 'isPublished', 'authorUid', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'title', 'type', 'section', 'author', 'year', 'reference',
+          'summary', 'content', 'externalUrl', 'imageUrl', 'images',
+          'coverAssetId', 'assetIds', 'ocrDetectedPage', 'ocrDocumentType',
+          'tags', 'isProtected', 'isPublished', 'authorUid', 'createdAt', 'updatedAt'
+        ])
+        && data.id is string && data.id.size() >= 1 && data.id.size() <= 128 && data.id == sourceId
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 320
+        && data.type is string && data.type.size() >= 3 && data.type.size() <= 16
+        && data.type in ['chapter', 'article', 'note', 'scan', 'citation', 'book']
+        && data.section is string && data.section.size() >= 8 && data.section.size() <= 16
+        && data.section in ['authored', 'references']
+        && (!('author' in data) || (data.author is string && data.author.size() >= 1 && data.author.size() <= 160))
+        && (!('year' in data) || (data.year is string && data.year.size() >= 1 && data.year.size() <= 32))
+        && (!('reference' in data) || (data.reference is string && data.reference.size() >= 1 && data.reference.size() <= 240))
+        && data.summary is string && data.summary.size() <= 4000
+        && (!('content' in data) || (data.content is string && data.content.size() <= 250000))
+        && (!('externalUrl' in data) || (data.externalUrl is string && data.externalUrl.size() >= 1 && data.externalUrl.size() <= 2048))
+        && (!('imageUrl' in data) || (data.imageUrl is string && data.imageUrl.size() >= 1 && data.imageUrl.size() <= 2048))
+        && (!('images' in data) || (
+          data.images is list
+          && data.images.size() <= 24
+          && (data.images.size() == 0 || (data.images[0] is string && data.images[0].size() >= 1 && data.images[0].size() <= 2048))
+        ))
+        && (!('coverAssetId' in data) || (
+          data.coverAssetId is string
+          && data.coverAssetId.size() >= 1
+          && data.coverAssetId.size() <= 128
+          && data.coverAssetId.matches('^[a-zA-Z0-9_\\-]+$')
+        ))
+        && (!('assetIds' in data) || (
+          data.assetIds is list
+          && data.assetIds.size() <= 24
+          && (data.assetIds.size() == 0 || (data.assetIds[0] is string && data.assetIds[0].size() >= 1 && data.assetIds[0].size() <= 128))
+        ))
+        && (!('ocrDetectedPage' in data) || (data.ocrDetectedPage is string && data.ocrDetectedPage.size() >= 1 && data.ocrDetectedPage.size() <= 40))
+        && (!('ocrDocumentType' in data) || (data.ocrDocumentType is string && data.ocrDocumentType.size() >= 1 && data.ocrDocumentType.size() <= 80))
+        && data.tags is list
+        && data.tags.size() <= 25
+        && (data.tags.size() == 0 || (data.tags[0] is string && data.tags[0].size() >= 1 && data.tags[0].size() <= 60))
+        && data.isProtected is bool
+        && data.isPublished is bool
+        && data.authorUid is string && data.authorUid.size() >= 1 && data.authorUid.size() <= 128 && data.authorUid == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPrivateSourceContent(data, sourceId) {
+      return data.keys().hasAll(['sourceId', 'rawContent', 'authorUid', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['sourceId', 'rawContent', 'rawTranscription', 'authorUid', 'createdAt', 'updatedAt'])
+        && data.sourceId is string && data.sourceId.size() >= 1 && data.sourceId.size() <= 128 && data.sourceId == sourceId
+        && data.rawContent is string && data.rawContent.size() <= 300000
+        && (!('rawTranscription' in data) || (data.rawTranscription is string && data.rawTranscription.size() <= 250000))
+        && data.authorUid is string && data.authorUid.size() >= 1 && data.authorUid.size() <= 128 && data.authorUid == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidArchiveAsset(data, assetId) {
+      return data.keys().hasAll([
+          'assetId', 'sourceId', 'mimeType', 'dataBase64',
+          'byteLength', 'isPublished', 'authorUid', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'assetId', 'sourceId', 'mimeType', 'dataBase64',
+          'byteLength', 'width', 'height', 'isPublished', 'authorUid', 'createdAt', 'updatedAt'
+        ])
+        && data.assetId is string && data.assetId.size() >= 1 && data.assetId.size() <= 128 && data.assetId == assetId
+        && data.sourceId is string && data.sourceId.size() >= 1 && data.sourceId.size() <= 128 && data.sourceId.matches('^[a-zA-Z0-9_\\-]+$')
+        && data.mimeType is string && data.mimeType.size() >= 9 && data.mimeType.size() <= 24
+        && data.mimeType in ['image/jpeg', 'image/png', 'image/webp', 'image/svg+xml']
+        && data.dataBase64 is string && data.dataBase64.size() >= 16 && data.dataBase64.size() <= 850000
+        && data.byteLength is int && data.byteLength >= 1 && data.byteLength <= 700000
+        && (!('width' in data) || (data.width is int && data.width >= 1 && data.width <= 8192))
+        && (!('height' in data) || (data.height is int && data.height >= 1 && data.height <= 8192))
+        && data.isPublished is bool
+        && data.authorUid is string && data.authorUid.size() >= 1 && data.authorUid.size() <= 128 && data.authorUid == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidArchiveTombstone(data, targetId) {
+      return data.keys().hasAll(['targetId', 'kind', 'isPublished', 'authorUid', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['targetId', 'kind', 'isPublished', 'authorUid', 'createdAt', 'updatedAt'])
+        && data.targetId is string && data.targetId.size() >= 1 && data.targetId.size() <= 128 && data.targetId == targetId
+        && data.kind is string && data.kind.size() >= 5 && data.kind.size() <= 10
+        && data.kind in ['source', 'asset']
+        && data.isPublished is bool
+        && data.authorUid is string && data.authorUid.size() >= 1 && data.authorUid.size() <= 128 && data.authorUid == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidArchiveConfig(data, configId) {
+      return data.keys().hasAll([
+          'configId', 'title', 'subtitle', 'author', 'authorRole', 'authorBio',
+          'publicationYear', 'description', 'coverAccent', 'isPublished', 'authorUid', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'configId', 'title', 'subtitle', 'author', 'authorRole', 'authorBio',
+          'isbn', 'publisher', 'publicationYear', 'description', 'coverAccent',
+          'purchaseUrl', 'isPublished', 'authorUid', 'createdAt', 'updatedAt'
+        ])
+        && data.configId is string && data.configId.size() >= 1 && data.configId.size() <= 64 && data.configId == configId
+        && data.title is string && data.title.size() >= 1 && data.title.size() <= 240
+        && data.subtitle is string && data.subtitle.size() <= 320
+        && data.author is string && data.author.size() >= 1 && data.author.size() <= 160
+        && data.authorRole is string && data.authorRole.size() <= 200
+        && data.authorBio is string && data.authorBio.size() <= 4000
+        && (!('isbn' in data) || (data.isbn is string && data.isbn.size() >= 1 && data.isbn.size() <= 64))
+        && (!('publisher' in data) || (data.publisher is string && data.publisher.size() >= 1 && data.publisher.size() <= 160))
+        && data.publicationYear is string && data.publicationYear.size() >= 1 && data.publicationYear.size() <= 32
+        && data.description is string && data.description.size() <= 4000
+        && data.coverAccent is string && data.coverAccent.size() >= 1 && data.coverAccent.size() <= 64
+        && (!('purchaseUrl' in data) || (data.purchaseUrl is string && data.purchaseUrl.size() >= 1 && data.purchaseUrl.size() <= 2048))
+        && data.isPublished is bool
+        && data.authorUid is string && data.authorUid.size() >= 1 && data.authorUid.size() <= 128 && data.authorUid == request.auth.uid
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // 1. Public Manuscript Metadata & Literature Entries
+    // =========================================================================
+    match /archive_sources/{sourceId} {
+      allow get: if isValidId(sourceId)
+        && (resource == null || existing().isPublished == true || isVerifiedAuthor());
+
+      allow list: if (existing().isPublished == true) || isVerifiedAuthor();
+
+      allow create: if isVerifiedAuthor()
+        && isValidId(sourceId)
+        && isValidArchiveSource(incoming(), sourceId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidArchiveSource(incoming(), sourceId)
+        && isVerifiedAuthor()
+        && isValidId(sourceId)
+        && incoming().id == existing().id
+        && incoming().authorUid == existing().authorUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action: Replace or Purge Cover & Gallery Assets
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'imageUrl', 'images', 'coverAssetId', 'assetIds', 'updatedAt'
+          ]) ||
+          // Action: Update Editorial Metadata, Author, Summary, or Passages
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'type', 'section', 'author', 'year', 'reference',
+            'summary', 'content', 'externalUrl', 'imageUrl', 'images',
+            'coverAssetId', 'assetIds', 'ocrDetectedPage', 'ocrDocumentType',
+            'tags', 'isProtected', 'isPublished', 'updatedAt'
+          ])
+        );
+
+      allow delete: if isVerifiedAuthor() && isValidId(sourceId);
+
+      // =======================================================================
+      // 1A. Split Subcollection: Protected Raw Manuscript Body & OCR
+      // =======================================================================
+      match /private_content/{contentId} {
+        allow get: if isVerifiedAuthor()
+          && isValidId(sourceId)
+          && isValidId(contentId);
+
+        allow list: if isVerifiedAuthor()
+          && existing().authorUid == request.auth.uid;
+
+        allow create: if isVerifiedAuthor()
+          && isValidId(sourceId)
+          && isValidId(contentId)
+          && isValidPrivateSourceContent(incoming(), sourceId)
+          && incoming().createdAt == request.time
+          && incoming().updatedAt == request.time
+          && (
+            exists(/databases/$(database)/documents/archive_sources/$(sourceId)) ||
+            existsAfter(/databases/$(database)/documents/archive_sources/$(sourceId))
+          )
+          && getAfter(/databases/$(database)/documents/archive_sources/$(sourceId)).data.authorUid == request.auth.uid;
+
+        allow update: if isValidPrivateSourceContent(incoming(), sourceId)
+          && isVerifiedAuthor()
+          && isValidId(sourceId)
+          && isValidId(contentId)
+          && incoming().sourceId == existing().sourceId
+          && incoming().authorUid == existing().authorUid
+          && incoming().createdAt == existing().createdAt
+          && incoming().updatedAt == request.time
+          && incoming().diff(existing()).affectedKeys().hasOnly([
+            'rawContent', 'rawTranscription', 'updatedAt'
+          ])
+          && (
+            exists(/databases/$(database)/documents/archive_sources/$(sourceId)) ||
+            existsAfter(/databases/$(database)/documents/archive_sources/$(sourceId))
+          )
+          && getAfter(/databases/$(database)/documents/archive_sources/$(sourceId)).data.authorUid == request.auth.uid;
+
+        allow delete: if isVerifiedAuthor()
+          && isValidId(sourceId)
+          && isValidId(contentId);
+      }
+    }
+
+    // =========================================================================
+    // 2. Content-Addressed Cover & Scan Assets (Purged on Replacement)
+    // =========================================================================
+    match /archive_assets/{assetId} {
+      allow get: if isValidId(assetId)
+        && (resource == null || existing().isPublished == true || isVerifiedAuthor());
+
+      allow list: if (existing().isPublished == true) || isVerifiedAuthor();
+
+      allow create: if isVerifiedAuthor()
+        && isValidId(assetId)
+        && isValidArchiveAsset(incoming(), assetId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidArchiveAsset(incoming(), assetId)
+        && isVerifiedAuthor()
+        && isValidId(assetId)
+        && incoming().assetId == existing().assetId
+        && incoming().authorUid == existing().authorUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'sourceId', 'mimeType', 'dataBase64', 'byteLength',
+          'width', 'height', 'isPublished', 'updatedAt'
+        ]);
+
+      allow delete: if isVerifiedAuthor() && isValidId(assetId);
+    }
+
+    // =========================================================================
+    // 3. Permanent Tombstone Registry (Prevents Resurrected Seed/Old Assets)
+    // =========================================================================
+    match /archive_tombstones/{targetId} {
+      allow get: if isValidId(targetId)
+        && (resource == null || existing().isPublished == true || isVerifiedAuthor());
+
+      allow list: if (existing().isPublished == true) || isVerifiedAuthor();
+
+      allow create: if isVerifiedAuthor()
+        && isValidId(targetId)
+        && isValidArchiveTombstone(incoming(), targetId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidArchiveTombstone(incoming(), targetId)
+        && isVerifiedAuthor()
+        && isValidId(targetId)
+        && incoming().targetId == existing().targetId
+        && incoming().authorUid == existing().authorUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'kind', 'isPublished', 'updatedAt'
+        ]);
+
+      allow delete: if isVerifiedAuthor() && isValidId(targetId);
+    }
+
+    // =========================================================================
+    // 4. Publication Metadata Configuration (book_metadata)
+    // =========================================================================
+    match /archive_config/{configId} {
+      allow get: if isValidId(configId)
+        && (resource == null || existing().isPublished == true || isVerifiedAuthor());
+
+      allow list: if (existing().isPublished == true) || isVerifiedAuthor();
+
+      allow create: if isVerifiedAuthor()
+        && isValidId(configId)
+        && isValidArchiveConfig(incoming(), configId)
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidArchiveConfig(incoming(), configId)
+        && isVerifiedAuthor()
+        && isValidId(configId)
+        && incoming().configId == existing().configId
+        && incoming().authorUid == existing().authorUid
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'subtitle', 'author', 'authorRole', 'authorBio',
+          'isbn', 'publisher', 'publicationYear', 'description',
+          'coverAccent', 'purchaseUrl', 'isPublished', 'updatedAt'
+        ]);
+
+      allow delete: if isVerifiedAuthor() && isValidId(configId);
+    }
+  }
+}

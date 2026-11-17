@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Source, getSourceImages } from '../types';
 import { sanitizeExternalUrl } from '../utils/security';
+import { readUploadedImageFileAsDataUrl } from '../utils/imagePipeline';
 
 interface SourceDetailModalProps {
   source: Source | null;
@@ -59,33 +60,32 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const handleQuickAddPictures = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleQuickAddPictures = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!isStudioAdmin || !onAddPicturesToSource) return;
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
-    const readers: Promise<string>[] = Array.from(files)
-      .filter((f) => f.type.startsWith('image/'))
-      .map(
-        (file) =>
-          new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onload = (ev) => resolve((ev.target?.result as string) || '');
-            reader.onerror = () => resolve('');
-            reader.readAsDataURL(file);
-          })
-      );
-
-    Promise.all(readers)
-      .then((dataUrls) => {
-        const valid = dataUrls.filter(Boolean);
-        if (valid.length > 0) {
-          Promise.resolve(onAddPicturesToSource(source, valid)).catch(() => {});
-        }
-      })
-      .catch(() => {});
-
+    const selected = Array.from(files).filter(
+      (f) =>
+        f.type.startsWith('image/') ||
+        /\.(avif|heic|heif|webp|png|jpe?g|gif|bmp|svg)$/i.test(f.name)
+    );
     e.target.value = '';
+    if (selected.length === 0) return;
+
+    try {
+      const decoded: string[] = [];
+      for (const file of selected) {
+        const dataUrl = await readUploadedImageFileAsDataUrl(file);
+        if (dataUrl) decoded.push(dataUrl);
+      }
+      if (decoded.length > 0) {
+        await Promise.resolve(onAddPicturesToSource(source, decoded));
+        setSelectedImageIdx(0);
+      }
+    } catch (err) {
+      console.warn('Quick cover upload warning:', err);
+    }
   };
 
   return (
@@ -130,14 +130,15 @@ export const SourceDetailModal: React.FC<SourceDetailModalProps> = ({
             {isStudioAdmin && onAddPicturesToSource && (
               <label
                 className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#F1F3F4] hover:bg-[#C83E0B] text-[#0B0B0C] hover:text-white text-xs font-medium cursor-pointer transition-colors"
-                title="Add Picture(s) to this Card"
+                title={allImages.length > 0 ? 'Replace cover picture and purge old asset' : 'Add cover picture to this card'}
               >
                 <ImagePlus className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Add Picture</span>
+                <span className="hidden sm:inline">
+                  {allImages.length > 0 ? 'Replace Cover' : 'Add Cover'}
+                </span>
                 <input
                   type="file"
-                  accept="image/*"
-                  multiple
+                  accept="image/*,image/avif,image/heic,image/heif,.avif,.heic,.heif"
                   onChange={handleQuickAddPictures}
                   className="hidden"
                 />

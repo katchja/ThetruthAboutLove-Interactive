@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { CloudUpload, AlertCircle, CheckCircle2, RefreshCw } from 'lucide-react';
 import { Header } from './components/Header';
 import { SourceDetailModal } from './components/SourceDetailModal';
 import { AddSourceModal } from './components/AddSourceModal';
@@ -26,6 +28,7 @@ import {
 import { defaultBookMetadata, seedSources } from './data/seedData';
 import { evaluateQueryGuardrails } from './utils/chatGuardrails';
 import {
+  computeChunksForSource,
   indexSource,
   indexSourcesBatch,
   loadArchiveFromDB,
@@ -34,7 +37,33 @@ import {
   clearDeletedSourcesRegistry,
   getDeletedSourceIds,
   isPurgedArchiveSource,
+  syncDeletedSourceIdsFromServer,
+  syncDeletedAssetIdsFromServer,
 } from './utils/vectorStore';
+import {
+  auth,
+  AUTHOR_EMAIL,
+  testFirestoreConnection,
+  isVerifiedAuthorUser,
+  signInStudioAuthor,
+  signOutStudioAuthor,
+} from './firebase';
+import {
+  fetchPublishedCloudArchive,
+  saveSourceToCloud,
+  deleteSourceFromCloud,
+  saveBookMetadataToCloud,
+  bootstrapCloudArchiveFromExisting,
+  getPendingCloudMutations,
+  enqueuePendingCloudMutation,
+  clearAllPendingCloudMutations,
+  getLocalDeletedAssetIds,
+  recordLocalDeletedAssetId,
+} from './utils/cloudArchive';
+import {
+  normalizeDataUrlToCloudAsset,
+  extractAssetIdFromUrl,
+} from './utils/imagePipeline';
 
 function synthesizeGroundedResponse(
   query: string,
@@ -89,15 +118,58 @@ function synthesizeGroundedResponse(
   return response;
 }
 
+function collectSourceAssetIds(source?: Source | null): string[] {
+  if (!source) return [];
+  const ids = new Set<string>();
+  if (source.coverAssetId) ids.add(source.coverAssetId);
+  for (const a of source.assetIds || []) {
+    if (a) ids.add(a);
+  }
+  for (const img of getSourceImages(source)) {
+    const aid = extractAssetIdFromUrl(img);
+    if (aid) ids.add(aid);
+  }
+  return Array.from(ids);
+}
+
+function computeSupersededAssetIds(
+  previousSource: Source | null | undefined,
+  nextSource: Source,
+  otherSources: Source[]
+): string[] {
+  const prevAssets = collectSourceAssetIds(previousSource);
+  if (prevAssets.length === 0) return [];
+
+  const nextAssets = new Set(collectSourceAssetIds(nextSource));
+  const usedElsewhere = new Set<string>();
+  for (const other of otherSources) {
+    if (!other || other.id === nextSource.id) continue;
+    for (const aid of collectSourceAssetIds(other)) {
+      usedElsewhere.add(aid);
+    }
+  }
+
+  return prevAssets.filter((aid) => !nextAssets.has(aid) && !usedElsewhere.has(aid));
+}
+
 export default function App() {
   // Core application views: 'landing' (default homepage) | 'archive'
   const [currentView, setCurrentView] = useState<AppView>('landing');
 
-  // Archive & Vector states
-  const [sources, setSources] = useState<Source[]>([]);
-  const [vectorChunks, setVectorChunks] = useState<VectorChunk[]>([]);
-  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
-  const [isLoadingArchive, setIsLoadingArchive] = useState(true);
+  // Archive & Vector states — pre-populated synchronously from seed corpus so chat & counts work at t=0ms
+  const [initialSeedSources] = useState<Source[]>(() => {
+    const deleted = getDeletedSourceIds();
+    return seedSources.filter((s) => !deleted.has(s.id) && !isPurgedArchiveSource(s));
+  });
+  const [sources, setSources] = useState<Source[]>(() => initialSeedSources);
+  const sourcesRef = useRef<Source[]>(initialSeedSources);
+  const [vectorChunks, setVectorChunks] = useState<VectorChunk[]>(() =>
+    initialSeedSources.flatMap((s) => computeChunksForSource(s))
+  );
+  const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>(() =>
+    initialSeedSources.map((s) => s.id)
+  );
+  const [, setIsLoadingArchive] = useState(true);
 
   // Conversational Chat state (locked exclusively to Gemini Flash-Lite)
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -111,6 +183,7 @@ export default function App() {
   // Book Metadata
   const [bookMetadata, setBookMetadata] =
     useState<BookMetadata>(defaultBookMetadata);
+  const bookMetadataRef = useRef<BookMetadata>(defaultBookMetadata);
 
   // Modals
   const [activeSourceDetail, setActiveSourceDetail] = useState<Source | null>(
@@ -131,7 +204,17 @@ export default function App() {
       window.location.hostname === 'localhost' ||
       window.location.hostname === '127.0.0.1');
 
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'syncing' | 'synced' | 'error'>('idle');
+  const [cloudAuthState, setCloudAuthState] = useState<
+    'checking' | 'connected' | 'unauthenticated'
+  >(isStudioBuildMode ? 'checking' : 'connected');
+  const [pendingCloudCount, setPendingCloudCount] = useState<number>(() =>
+    isStudioBuildMode ? getPendingCloudMutations().length : 0
+  );
+  const [syncErrorMessage, setSyncErrorMessage] = useState<string | null>(null);
+
+  const [syncStatus, setSyncStatus] = useState<
+    'idle' | 'syncing' | 'synced' | 'error'
+  >('idle');
   const [syncedStats, setSyncedStats] = useState<{
     totalSources: number;
     photoCount: number;
@@ -141,6 +224,29 @@ export default function App() {
     photoCount: 0,
     citationCount: 0,
   });
+
+  const cloudBootstrappedRef = useRef(false);
+  const initCompletedRef = useRef(false);
+  const isFlushingCloudRef = useRef(false);
+
+  const updateSourcesAndRef = useCallback(
+    (updater: Source[] | ((prev: Source[]) => Source[])) => {
+      setSources((prev) => {
+        const next = typeof updater === 'function' ? updater(prev) : updater;
+        sourcesRef.current = next;
+        return next;
+      });
+    },
+    []
+  );
+
+  useEffect(() => {
+    sourcesRef.current = sources;
+  }, [sources]);
+
+  useEffect(() => {
+    bookMetadataRef.current = bookMetadata;
+  }, [bookMetadata]);
 
   const getAdminHeaders = () => ({
     'Content-Type': 'application/json',
@@ -167,81 +273,7 @@ export default function App() {
     };
   };
 
-  /**
-   * Compresses oversized base64 raster images (>220KB) via HTML5 Canvas so uploaded photos
-   * never exceed Cloud Run proxy body limits and load rapidly on the public app.
-   */
-  const optimizeImageDataUrl = (
-    dataUrl: string,
-    maxDim = 1400,
-    quality = 0.84
-  ): Promise<string> => {
-    return new Promise((resolve) => {
-      if (
-        !dataUrl ||
-        typeof dataUrl !== 'string' ||
-        !dataUrl.startsWith('data:image/') ||
-        dataUrl.startsWith('data:image/svg') ||
-        dataUrl.length <= 280000
-      ) {
-        resolve(dataUrl);
-        return;
-      }
-
-      if (typeof document === 'undefined' || typeof Image === 'undefined') {
-        resolve(dataUrl);
-        return;
-      }
-
-      const img = new Image();
-      const timeoutId = setTimeout(() => resolve(dataUrl), 4000);
-
-      img.onload = () => {
-        clearTimeout(timeoutId);
-        try {
-          let { width, height } = img;
-          if (!width || !height) {
-            resolve(dataUrl);
-            return;
-          }
-          if (width > maxDim || height > maxDim) {
-            if (width >= height) {
-              height = Math.round((height * maxDim) / width);
-              width = maxDim;
-            } else {
-              width = Math.round((width * maxDim) / height);
-              height = maxDim;
-            }
-          }
-          const canvas = document.createElement('canvas');
-          canvas.width = width;
-          canvas.height = height;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            resolve(dataUrl);
-            return;
-          }
-          // Fill warm paper background for transparent PNGs before JPEG encoding
-          ctx.fillStyle = '#FAF7F2';
-          ctx.fillRect(0, 0, width, height);
-          ctx.drawImage(img, 0, 0, width, height);
-          const compressed = canvas.toDataURL('image/jpeg', quality);
-          resolve(compressed.length < dataUrl.length ? compressed : dataUrl);
-        } catch {
-          resolve(dataUrl);
-        }
-      };
-
-      img.onerror = () => {
-        clearTimeout(timeoutId);
-        resolve(dataUrl);
-      };
-
-      img.src = dataUrl;
-    });
-  };
-
-  const optimizeSourceForSync = async (source: Source): Promise<Source> => {
+  const normalizeSourceImagesForClient = async (source: Source): Promise<Source> => {
     const rawImages = getSourceImages(source);
     const resolvedSection = getSourceSection(source);
     if (rawImages.length === 0) {
@@ -252,437 +284,819 @@ export default function App() {
         images: undefined,
       };
     }
-    const optimizedImages: string[] = [];
-    for (const img of rawImages) {
-      const opt = await optimizeImageDataUrl(img);
-      if (opt && !optimizedImages.includes(opt)) {
-        optimizedImages.push(opt);
+
+    const normalized: string[] = [];
+    for (const img of rawImages.slice(0, 24)) {
+      if (!img) continue;
+      if (img.startsWith('data:image/')) {
+        const asset = await normalizeDataUrlToCloudAsset(img);
+        const finalUrl = asset?.dataUrl || img;
+        if (finalUrl && !normalized.includes(finalUrl)) {
+          normalized.push(finalUrl);
+        }
+      } else if (!normalized.includes(img)) {
+        normalized.push(img);
       }
     }
+
     return {
       ...source,
       section: resolvedSection,
-      imageUrl: optimizedImages[0] || undefined,
-      images: optimizedImages.length > 0 ? optimizedImages : undefined,
+      imageUrl: normalized[0] || undefined,
+      images: normalized.length > 0 ? normalized : undefined,
     };
   };
 
   /**
-   * Publishes all Studio sources, bibliographic citations, and card photos to the backend
-   * so they are immediately visible on the public shared link (ais-pre-*).
+   * Mirrors the current canonical archive snapshot to the Express server's local cache
+   * so SSR/SEO routes (/sitemap.xml, /llms-full.txt) and /api/archive reflect changes immediately.
    */
-  const publishArchiveToPublic = async (
-    customSources?: Source[],
-    customDeletedIds?: string[],
-    customMetadata?: BookMetadata
-  ) => {
+  const mirrorFullArchiveToServer = async (
+    targetSources: Source[],
+    targetDeletedIds: string[],
+    targetMetadata: BookMetadata
+  ): Promise<void> => {
     if (!isStudioBuildMode) return;
-    const rawSources = customSources || sources;
-    const targetDeleted = customDeletedIds || Array.from(getDeletedSourceIds());
-    const targetMetadata = customMetadata || bookMetadata;
-
-    setSyncStatus('syncing');
-    try {
-      // Optimize any oversized base64 photos so requests never fail proxy size limits
-      const targetSources: Source[] = [];
-      for (const s of rawSources) {
-        const opt = await optimizeSourceForSync(s);
-        targetSources.push(opt);
-      }
-
-      // Check total serialized payload size
-      const fullPayload = JSON.stringify({
+    const deletedAssetIds = Array.from(getLocalDeletedAssetIds());
+    const syncRes = await fetch('/api/archive/sync', {
+      method: 'POST',
+      headers: getAdminHeaders(),
+      body: JSON.stringify({
         sources: targetSources,
-        deletedIds: targetDeleted,
+        deletedIds: targetDeletedIds,
+        deletedAssetIds,
         bookMetadata: targetMetadata,
-      });
-
-      if (fullPayload.length < 20000000) {
-        // Fast single-request atomic sync (includes all citations, chapters, and optimized photos)
-        const syncRes = await fetch('/api/archive/sync', {
-          method: 'POST',
-          headers: getAdminHeaders(),
-          body: fullPayload,
-        });
-        if (!syncRes.ok) {
-          throw new Error(`Sync failed with status ${syncRes.status}`);
-        }
-      } else {
-        // Fallback for very large multi-photo archives:
-        // Step 1: Sync all text, metadata, and Bibliographic & Citation Index entries first
-        const lightweightSources = targetSources.map((s) => {
-          const hasLargeDataUrl =
-            (s.imageUrl && s.imageUrl.startsWith('data:') && s.imageUrl.length > 60000) ||
-            (Array.isArray(s.images) &&
-              s.images.some((img) => img && img.startsWith('data:') && img.length > 60000));
-          if (!hasLargeDataUrl) return s;
-          return {
-            ...s,
-            imageUrl:
-              s.imageUrl && !s.imageUrl.startsWith('data:') ? s.imageUrl : undefined,
-            images: undefined,
-          };
-        });
-
-        const syncRes = await fetch('/api/archive/sync', {
-          method: 'POST',
-          headers: getAdminHeaders(),
-          body: JSON.stringify({
-            sources: lightweightSources,
-            deletedIds: targetDeleted,
-            bookMetadata: targetMetadata,
-            preserveExistingImages: true,
-          }),
-        });
-
-        if (!syncRes.ok) {
-          throw new Error(`Sync failed with status ${syncRes.status}`);
-        }
-
-        // Step 2: Upload each source with attached photos individually when payload exceeded single-request limit
-        const sourcesWithPhotos = targetSources.filter(
-          (s) => getSourceImages(s).length > 0
-        );
-        for (const photoSource of sourcesWithPhotos) {
-          const photoRes = await fetch('/api/archive/source', {
-            method: 'POST',
-            headers: getAdminHeaders(),
-            body: JSON.stringify({ source: photoSource }),
-          });
-          if (!photoRes.ok) {
-            throw new Error(`Photo source sync failed with status ${photoRes.status}`);
-          }
-        }
-      }
-
-      // Verify canonical server state
-      try {
-        const verifyRes = await fetch(`/api/archive?t=${Date.now()}`, {
-          cache: 'no-store',
-          headers: { Accept: 'application/json' },
-        });
-        if (verifyRes.ok) {
-          const verified = await verifyRes.json();
-          if (verified?.stats) {
-            setSyncedStats(verified.stats);
-            setSyncStatus('synced');
-            return;
-          }
-        }
-      } catch {}
-
-      setSyncedStats(computeLocalStats(targetSources));
-      setSyncStatus('synced');
-    } catch (err) {
-      console.warn('Studio archive publish notice:', err);
-      setSyncedStats(computeLocalStats(rawSources));
-      setSyncStatus('synced');
+      }),
+    });
+    if (!syncRes.ok) {
+      throw new Error(`Server mirror sync failed (${syncRes.status})`);
     }
   };
 
-  // 1. Initialize Archive: Sync canonical server archive with local vector store
+  /**
+   * Flushes pending local mutations or bootstraps Cloud Firestore when the verified
+   * Studio Author (butnaru.catalina@gmail.com) is authenticated.
+   */
+  const syncCloudForVerifiedAuthor = useCallback(
+    async (forceFullSync = false): Promise<void> => {
+      if (!isStudioBuildMode || !isVerifiedAuthorUser(auth.currentUser)) {
+        return;
+      }
+      if (isFlushingCloudRef.current) return;
+      isFlushingCloudRef.current = true;
+      setSyncStatus('syncing');
+      setSyncErrorMessage(null);
+
+      try {
+        const cloudSnap = await fetchPublishedCloudArchive(true);
+
+        if (!cloudSnap.hasCloudData || forceFullSync) {
+          // Migrate all active chapters, literature references, tombstones, and card artworks to Firestore
+          const migrated = await bootstrapCloudArchiveFromExisting(
+            sourcesRef.current,
+            Array.from(getDeletedSourceIds()),
+            bookMetadataRef.current
+          );
+          cloudBootstrappedRef.current = true;
+          clearAllPendingCloudMutations();
+          setPendingCloudCount(0);
+
+          const indexedChunks = await indexSourcesBatch(migrated);
+          updateSourcesAndRef(migrated);
+          setVectorChunks(indexedChunks);
+          setSelectedSourceIds(migrated.map((s) => s.id));
+          setSyncedStats(computeLocalStats(migrated));
+
+          await mirrorFullArchiveToServer(
+            migrated,
+            Array.from(getDeletedSourceIds()),
+            bookMetadataRef.current
+          );
+          setSyncStatus('synced');
+          return;
+        }
+
+        cloudBootstrappedRef.current = true;
+        const queue = getPendingCloudMutations();
+
+        if (queue.length > 0) {
+          for (const item of queue) {
+            if (item.kind === 'save_metadata') {
+              await saveBookMetadataToCloud(bookMetadataRef.current);
+            } else if (item.kind === 'delete_source') {
+              await deleteSourceFromCloud(item.targetId, null, sourcesRef.current);
+            } else if (item.kind === 'upsert_source') {
+              const target = sourcesRef.current.find((s) => s.id === item.targetId);
+              if (target) {
+                const others = sourcesRef.current.filter((s) => s.id !== target.id);
+                const { persistedSource, purgedAssetIds } = await saveSourceToCloud(
+                  target,
+                  null,
+                  others
+                );
+                updateSourcesAndRef((prev) =>
+                  prev.map((s) => (s.id === persistedSource.id ? persistedSource : s))
+                );
+                await fetch('/api/archive/source', {
+                  method: 'POST',
+                  headers: getAdminHeaders(),
+                  body: JSON.stringify({
+                    source: persistedSource,
+                    purgedAssetIds: [
+                      ...(item.purgedAssetIds || []),
+                      ...purgedAssetIds,
+                    ],
+                  }),
+                }).catch(() => {});
+              }
+            }
+          }
+          clearAllPendingCloudMutations();
+          setPendingCloudCount(0);
+        }
+
+        // Refresh full cloud state (including private_content/full for verified author)
+        const refreshed = await fetchPublishedCloudArchive(true);
+        if (refreshed.hasCloudData) {
+          syncDeletedSourceIdsFromServer(refreshed.deletedSourceIds);
+          syncDeletedAssetIdsFromServer(refreshed.deletedAssetIds);
+          if (refreshed.bookMetadata) {
+            setBookMetadata(refreshed.bookMetadata);
+            bookMetadataRef.current = refreshed.bookMetadata;
+          }
+          const indexedChunks = await indexSourcesBatch(refreshed.sources);
+          updateSourcesAndRef(refreshed.sources);
+          setVectorChunks(indexedChunks);
+          setSelectedSourceIds(refreshed.sources.map((s) => s.id));
+          setSyncedStats(computeLocalStats(refreshed.sources));
+          await mirrorFullArchiveToServer(
+            refreshed.sources,
+            refreshed.deletedSourceIds,
+            refreshed.bookMetadata || bookMetadataRef.current
+          ).catch(() => {});
+        }
+
+        setSyncStatus('synced');
+      } catch (err) {
+        const rawMsg = err instanceof Error ? err.message : String(err);
+        console.error('Cloud archive synchronization error:', rawMsg);
+        setSyncErrorMessage(
+          'Cloud save encountered an error. Click Retry to sync changes to Firestore.'
+        );
+        setSyncStatus('error');
+      } finally {
+        isFlushingCloudRef.current = false;
+      }
+    },
+    [isStudioBuildMode, updateSourcesAndRef]
+  );
+
+  const handleConnectCloudAuthor = useCallback(async (): Promise<boolean> => {
+    if (!isStudioBuildMode) return false;
+    setSyncErrorMessage(null);
+    try {
+      const user = await signInStudioAuthor();
+      if (!isVerifiedAuthorUser(user)) {
+        await signOutStudioAuthor().catch(() => {});
+        setCloudAuthState('unauthenticated');
+        setSyncErrorMessage(
+          `Please sign in with the verified author account (${AUTHOR_EMAIL}) to write to Cloud Firestore.`
+        );
+        setSyncStatus('error');
+        return false;
+      }
+      setCloudAuthState('connected');
+      await syncCloudForVerifiedAuthor(false);
+      return true;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Ignore benign popup-closed-by-user / blocked notices while keeping honest unauthenticated banner
+      if (
+        msg.includes('popup-closed-by-user') ||
+        msg.includes('popup-blocked') ||
+        msg.includes('cancelled-popup-request')
+      ) {
+        setCloudAuthState('unauthenticated');
+        return false;
+      }
+      setSyncErrorMessage(
+        'Author Google sign-in could not complete. Click Connect Cloud Auto-Save to try again.'
+      );
+      setSyncStatus('error');
+      return false;
+    }
+  }, [isStudioBuildMode, syncCloudForVerifiedAuthor]);
+
+  /**
+   * Explicit manual Cloud Sync / Retry action from Studio toolbar
+   */
+  const publishArchiveToPublic = async () => {
+    if (!isStudioBuildMode) return;
+    if (!isVerifiedAuthorUser(auth.currentUser)) {
+      await handleConnectCloudAuthor();
+      return;
+    }
+    await syncCloudForVerifiedAuthor(true);
+  };
+
+  // Subscribe to Firebase Auth state inside Studio preview only
+  useEffect(() => {
+    if (!isStudioBuildMode) return;
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (isVerifiedAuthorUser(user)) {
+        setCloudAuthState('connected');
+        if (initCompletedRef.current) {
+          syncCloudForVerifiedAuthor(false).catch(() => {});
+        }
+      } else {
+        setCloudAuthState('unauthenticated');
+      }
+    });
+    return () => unsubscribe();
+  }, [isStudioBuildMode, syncCloudForVerifiedAuthor]);
+
+  // 1. Initialize Archive: Reconcile Cloud Firestore + Express Mirror + IndexedDB
   useEffect(() => {
     async function init() {
       setIsLoadingArchive(true);
-      try {
-        // Fetch canonical server archive (readable by everyone so all visitors see pictures & citations)
-        let serverSources: Source[] = [];
-        let serverDeletedIds: string[] = [];
-        let serverMetadata: BookMetadata | undefined;
+      testFirestoreConnection().catch(() => {});
 
-        try {
-          const res = await fetch(`/api/archive?t=${Date.now()}`, {
+      try {
+        // Wait briefly for Firebase Auth persistence restoration in Studio
+        if (isStudioBuildMode && typeof auth.authStateReady === 'function') {
+          await Promise.race([
+            auth.authStateReady(),
+            new Promise((resolve) => setTimeout(resolve, 2000)),
+          ]);
+        }
+
+        if (isStudioBuildMode) {
+          setCloudAuthState(
+            isVerifiedAuthorUser(auth.currentUser) ? 'connected' : 'unauthenticated'
+          );
+        }
+
+        const [cloudResult, serverResponse, stored] = await Promise.all([
+          Promise.race([
+            fetchPublishedCloudArchive(isStudioBuildMode),
+            new Promise<never>((_, reject) =>
+              setTimeout(() => reject(new Error('Cloud Firestore read timed out')), 5000)
+            ),
+          ]).catch((err) => {
+            console.warn('Cloud Firestore initial read fallback:', err);
+            return {
+              sources: [] as Source[],
+              deletedSourceIds: [] as string[],
+              deletedAssetIds: [] as string[],
+              bookMetadata: undefined,
+              hasCloudData: false,
+            };
+          }),
+          fetch(`/api/archive?t=${Date.now()}`, {
             cache: 'no-store',
             headers: { Accept: 'application/json' },
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (Array.isArray(data?.sources)) serverSources = data.sources;
-            if (Array.isArray(data?.deletedIds)) serverDeletedIds = data.deletedIds;
-            if (data?.bookMetadata && typeof data.bookMetadata === 'object') {
-              serverMetadata = data.bookMetadata;
-            }
-          }
-        } catch (fetchErr) {
-          console.warn('Server /api/archive fetch fallback:', fetchErr);
-        }
+          })
+            .then(async (res) => (res.ok ? res.json() : null))
+            .catch(() => null),
+          loadArchiveFromDB(),
+        ]);
 
-        // Fallback to static /archive-store.json if needed
-        if (serverSources.length === 0) {
-          try {
-            const staticRes = await fetch(`/archive-store.json?t=${Date.now()}`, {
-              cache: 'no-store',
-              headers: { Accept: 'application/json' },
-            });
-            if (staticRes.ok) {
-              const staticData = await staticRes.json();
-              if (Array.isArray(staticData?.sources)) serverSources = staticData.sources;
-              if (Array.isArray(staticData?.deletedIds)) {
-                serverDeletedIds = staticData.deletedIds;
-              }
-              if (staticData?.bookMetadata && typeof staticData.bookMetadata === 'object') {
-                serverMetadata = staticData.bookMetadata;
-              }
-            }
-          } catch {}
-        }
+        const serverSources: Source[] = Array.isArray(serverResponse?.sources)
+          ? serverResponse.sources
+          : [];
+        const serverDeletedIds: string[] = Array.isArray(serverResponse?.deletedIds)
+          ? serverResponse.deletedIds
+          : [];
+        const serverDeletedAssetIds: string[] = Array.isArray(
+          serverResponse?.deletedAssetIds
+        )
+          ? serverResponse.deletedAssetIds
+          : [];
+        const serverMetadata: BookMetadata | undefined =
+          serverResponse?.bookMetadata && typeof serverResponse.bookMetadata === 'object'
+            ? serverResponse.bookMetadata
+            : undefined;
 
-        if (serverMetadata) {
-          setBookMetadata(serverMetadata);
-        }
+        const localDeletedIds = isStudioBuildMode
+          ? Array.from(getDeletedSourceIds())
+          : [];
+        const localDeletedAssets = isStudioBuildMode
+          ? Array.from(getLocalDeletedAssetIds())
+          : [];
 
-        const localDeletedIds = isStudioBuildMode ? Array.from(getDeletedSourceIds()) : [];
-        const combinedDeleted = new Set<string>([
+        const combinedDeletedSources = new Set<string>([
+          ...cloudResult.deletedSourceIds,
           ...serverDeletedIds,
           ...localDeletedIds,
         ]);
+        const combinedDeletedAssets = new Set<string>([
+          ...cloudResult.deletedAssetIds,
+          ...serverDeletedAssetIds,
+          ...localDeletedAssets,
+        ]);
 
-        const stored = await loadArchiveFromDB();
+        syncDeletedSourceIdsFromServer(Array.from(combinedDeletedSources));
+        syncDeletedAssetIdsFromServer(Array.from(combinedDeletedAssets));
 
-        // Build canonical source map:
-        // When serverSources is available from /api/archive, it is the authoritative persisted state
-        // (including any removed images or edited passages).
+        const resolvedMetadata =
+          cloudResult.bookMetadata || serverMetadata || defaultBookMetadata;
+        setBookMetadata(resolvedMetadata);
+        bookMetadataRef.current = resolvedMetadata;
+
+        const cleanSourceAssets = (s: Source): Source => {
+          const validImgs = getSourceImages(s).filter((u) => {
+            const aid = extractAssetIdFromUrl(u);
+            return !(aid && combinedDeletedAssets.has(aid));
+          });
+          return {
+            ...s,
+            section: getSourceSection(s),
+            imageUrl: validImgs[0] || undefined,
+            images: validImgs.length > 0 ? validImgs : undefined,
+          };
+        };
+
         const byId = new Map<string, Source>();
 
-        if (serverSources.length > 0) {
+        if (cloudResult.hasCloudData) {
+          cloudBootstrappedRef.current = true;
+          for (const cSrc of cloudResult.sources) {
+            if (
+              cSrc &&
+              cSrc.id &&
+              !combinedDeletedSources.has(cSrc.id) &&
+              !isPurgedArchiveSource(cSrc)
+            ) {
+              byId.set(cSrc.id, cleanSourceAssets(cSrc));
+            }
+          }
+          // Include newly added bundled/seed references that have never been tombstoned
+          // and enqueue them for automatic Firestore persistence in Studio
+          for (const candidate of [...serverSources, ...seedSources]) {
+            if (
+              candidate &&
+              candidate.id &&
+              !byId.has(candidate.id) &&
+              !combinedDeletedSources.has(candidate.id) &&
+              !isPurgedArchiveSource(candidate)
+            ) {
+              byId.set(candidate.id, cleanSourceAssets(candidate));
+              if (isStudioBuildMode) {
+                enqueuePendingCloudMutation({
+                  kind: 'upsert_source',
+                  targetId: candidate.id,
+                  timestamp: candidate.updatedAt || Date.now(),
+                });
+              }
+            }
+          }
+        } else if (serverSources.length > 0) {
           for (const srv of serverSources) {
-            if (srv && srv.id && !combinedDeleted.has(srv.id) && !isPurgedArchiveSource(srv)) {
-              const srvImages = getSourceImages(srv);
-              byId.set(srv.id, {
-                ...srv,
-                section: getSourceSection(srv),
-                imageUrl: srvImages[0] || undefined,
-                images: srvImages.length > 0 ? srvImages : undefined,
-              });
+            if (
+              srv &&
+              srv.id &&
+              !combinedDeletedSources.has(srv.id) &&
+              !isPurgedArchiveSource(srv)
+            ) {
+              byId.set(srv.id, cleanSourceAssets(srv));
             }
           }
         } else {
           for (const seed of seedSources) {
-            if (!combinedDeleted.has(seed.id) && !isPurgedArchiveSource(seed)) {
-              const seedImgs = getSourceImages(seed);
-              byId.set(seed.id, {
-                ...seed,
-                section: getSourceSection(seed),
-                imageUrl: seedImgs[0] || undefined,
-                images: seedImgs.length > 0 ? seedImgs : undefined,
-              });
+            if (
+              !combinedDeletedSources.has(seed.id) &&
+              !isPurgedArchiveSource(seed)
+            ) {
+              byId.set(seed.id, cleanSourceAssets(seed));
             }
           }
         }
 
-        // Only merge brand-new offline-created cards from IndexedDB that do not exist on the server yet
-        let hasLocalUnsyncedChanges = localDeletedIds.some(
-          (id) => !serverDeletedIds.includes(id)
-        );
+        // Preserve any pending local Studio edits that haven't flushed to Cloud Firestore yet
+        if (isStudioBuildMode) {
+          const pendingMutations = getPendingCloudMutations();
+          const pendingUpsertIds = new Set(
+            pendingMutations
+              .filter((m) => m.kind === 'upsert_source')
+              .map((m) => m.targetId)
+          );
+          const pendingDeleteIds = new Set(
+            pendingMutations
+              .filter((m) => m.kind === 'delete_source')
+              .map((m) => m.targetId)
+          );
 
-        if (isStudioBuildMode && stored.sources.length > 0) {
+          for (const delId of pendingDeleteIds) {
+            byId.delete(delId);
+          }
+
           for (const loc of stored.sources) {
-            if (!loc || !loc.id || combinedDeleted.has(loc.id) || isPurgedArchiveSource(loc)) {
+            if (
+              !loc ||
+              !loc.id ||
+              combinedDeletedSources.has(loc.id) ||
+              pendingDeleteIds.has(loc.id) ||
+              isPurgedArchiveSource(loc)
+            ) {
               continue;
             }
-            if (!byId.has(loc.id)) {
-              const locImages = getSourceImages(loc);
-              hasLocalUnsyncedChanges = true;
-              byId.set(loc.id, {
-                ...loc,
-                section: getSourceSection(loc),
-                imageUrl: locImages[0] || undefined,
-                images: locImages.length > 0 ? locImages : undefined,
-              });
+
+            const existing = byId.get(loc.id);
+            const locUpdated = loc.updatedAt || 0;
+            const exUpdated = existing?.updatedAt || 0;
+
+            const shouldKeepLocal =
+              pendingUpsertIds.has(loc.id) ||
+              (!cloudResult.hasCloudData && (!existing || locUpdated > exUpdated));
+
+            if (shouldKeepLocal) {
+              byId.set(loc.id, cleanSourceAssets(loc));
+              if (!pendingUpsertIds.has(loc.id)) {
+                enqueuePendingCloudMutation({
+                  kind: 'upsert_source',
+                  targetId: loc.id,
+                  timestamp: locUpdated || Date.now(),
+                });
+              }
             }
           }
+
+          setPendingCloudCount(getPendingCloudMutations().length);
         }
 
         const finalSources = Array.from(byId.values());
-
-        // Index all canonical sources into local vector chunks in a single batch transaction
         const allIndexedChunks = await indexSourcesBatch(finalSources);
 
-        setSources(finalSources);
+        updateSourcesAndRef(finalSources);
         setVectorChunks(allIndexedChunks);
         setSelectedSourceIds(finalSources.map((s) => s.id));
         setSyncedStats(computeLocalStats(finalSources));
+        initCompletedRef.current = true;
 
-        // Only auto-publish on startup if local IndexedDB has unsynced brand-new sources or deletions
         if (isStudioBuildMode) {
-          if (hasLocalUnsyncedChanges) {
-            await publishArchiveToPublic(
-              finalSources,
-              Array.from(combinedDeleted),
-              serverMetadata || bookMetadata
-            );
-          } else {
+          if (isVerifiedAuthorUser(auth.currentUser)) {
+            await syncCloudForVerifiedAuthor(false);
+          } else if (cloudResult.hasCloudData && getPendingCloudMutations().length === 0) {
             setSyncStatus('synced');
+          } else {
+            setSyncStatus('idle');
           }
         }
       } catch (err) {
         console.warn('Archive initialization fallback:', err);
         const deletedSet = getDeletedSourceIds();
         const activeSeeds = seedSources.filter((s) => !deletedSet.has(s.id));
-        setSources(activeSeeds);
+        const fallbackChunks = activeSeeds.flatMap((s) => computeChunksForSource(s));
+        updateSourcesAndRef(activeSeeds);
+        setVectorChunks(fallbackChunks);
         setSelectedSourceIds(activeSeeds.map((s) => s.id));
+        initCompletedRef.current = true;
       } finally {
         setIsLoadingArchive(false);
       }
     }
-    init().catch(() => {});
-  }, []);
 
-  // Ingest new source with automated vector indexing (Google Studio Author Only)
+    init().catch(() => {});
+  }, [isStudioBuildMode, syncCloudForVerifiedAuthor, updateSourcesAndRef]);
+
+  // Create new chapter or literature entry with automatic Cloud Firestore persistence
   const handleAddSource = async (newSource: Source) => {
     if (!isStudioBuildMode) return;
+    setSyncStatus('syncing');
+    setSyncErrorMessage(null);
+
     try {
-      const optimized = await optimizeSourceForSync({
+      const prepared = await normalizeSourceImagesForClient({
         ...newSource,
+        createdAt: newSource.createdAt || Date.now(),
         updatedAt: Date.now(),
       });
-      const chunks = await indexSource(optimized);
-      const nextSources = [optimized, ...sources];
-      setSources(nextSources);
-      setVectorChunks((prev) => [...chunks, ...prev]);
-      setSelectedSourceIds((prev) => [optimized.id, ...prev]);
 
-      await publishArchiveToPublic(nextSources);
+      // Optimistic local state + vector indexing
+      const optimisticChunks = await indexSource(prepared);
+      const otherSources = sourcesRef.current.filter((s) => s.id !== prepared.id);
+      const optimisticList = [prepared, ...otherSources];
+      updateSourcesAndRef(optimisticList);
+      setVectorChunks((prev) => [
+        ...optimisticChunks,
+        ...prev.filter((c) => c.sourceId !== prepared.id),
+      ]);
+      setSelectedSourceIds((prev) =>
+        prev.includes(prepared.id) ? prev : [prepared.id, ...prev]
+      );
+
+      if (isVerifiedAuthorUser(auth.currentUser)) {
+        const { persistedSource, purgedAssetIds } = await saveSourceToCloud(
+          prepared,
+          null,
+          otherSources
+        );
+        const finalChunks = await indexSource(persistedSource);
+        updateSourcesAndRef((prev) =>
+          prev.map((s) => (s.id === prepared.id ? persistedSource : s))
+        );
+        setVectorChunks((prev) => [
+          ...finalChunks,
+          ...prev.filter(
+            (c) => c.sourceId !== prepared.id && c.sourceId !== persistedSource.id
+          ),
+        ]);
+        setSyncedStats(computeLocalStats(sourcesRef.current));
+
+        await fetch('/api/archive/source', {
+          method: 'POST',
+          headers: getAdminHeaders(),
+          body: JSON.stringify({ source: persistedSource, purgedAssetIds }),
+        }).catch(() => {});
+
+        setSyncStatus('synced');
+      } else {
+        await fetch('/api/archive/source', {
+          method: 'POST',
+          headers: getAdminHeaders(),
+          body: JSON.stringify({ source: prepared }),
+        }).catch(() => {});
+
+        enqueuePendingCloudMutation({
+          kind: 'upsert_source',
+          targetId: prepared.id,
+          timestamp: Date.now(),
+        });
+        setPendingCloudCount(getPendingCloudMutations().length);
+        setSyncedStats(computeLocalStats(sourcesRef.current));
+        setSyncStatus('idle');
+        await handleConnectCloudAuthor();
+      }
     } catch (err) {
-      console.warn('Failed to add source:', err);
+      console.error('Failed to add source to cloud archive:', err);
+      setSyncErrorMessage('Failed to save new entry to Cloud Firestore. Click Retry.');
+      setSyncStatus('error');
     }
   };
 
-  // Update existing source (title, passages, author, pictures, and all fields) and re-index vectors
+  // Update existing chapter / literature entry, purge any replaced cover assets, and auto-save to Cloud Firestore
   const handleUpdateSource = async (updatedSource: Source) => {
     if (!isStudioBuildMode) return;
+    setSyncStatus('syncing');
+    setSyncErrorMessage(null);
+
+    const previousSource =
+      sourcesRef.current.find((s) => s.id === updatedSource.id) || null;
+    const otherSources = sourcesRef.current.filter(
+      (s) => s.id !== updatedSource.id
+    );
+
     try {
-      const optimized = await optimizeSourceForSync({
+      const prepared = await normalizeSourceImagesForClient({
         ...updatedSource,
         updatedAt: Date.now(),
       });
 
-      // Persist single-card update directly to server first so image removals and edits are saved atomically
-      let persistedSource = optimized;
-      try {
-        setSyncStatus('syncing');
-        const singleRes = await fetch('/api/archive/source', {
-          method: 'POST',
-          headers: getAdminHeaders(),
-          body: JSON.stringify({ source: optimized }),
-        });
-        if (singleRes.ok) {
-          const singleData = await singleRes.json();
-          if (singleData?.source) {
-            persistedSource = {
-              ...singleData.source,
-              imageUrl: singleData.source.imageUrl || undefined,
-              images:
-                Array.isArray(singleData.source.images) && singleData.source.images.length > 0
-                  ? singleData.source.images
-                  : undefined,
-            };
-          }
-        }
-      } catch (srvErr) {
-        console.warn('Direct source save notice:', srvErr);
+      const localPurgedAssetIds = computeSupersededAssetIds(
+        previousSource,
+        prepared,
+        otherSources
+      );
+      for (const aid of localPurgedAssetIds) {
+        recordLocalDeletedAssetId(aid);
       }
 
-      const newChunks = await indexSource(persistedSource);
-      const nextSources = sources.map((s) =>
-        s.id === persistedSource.id ? persistedSource : s
+      // Immediate UI & local vector update (using functional state + ref, never stale closures)
+      const optimisticChunks = await indexSource(prepared);
+      updateSourcesAndRef((prev) =>
+        prev.map((s) => (s.id === prepared.id ? prepared : s))
       );
-      setSources(nextSources);
       setVectorChunks((prev) => [
-        ...prev.filter((c) => c.sourceId !== persistedSource.id),
-        ...newChunks,
+        ...prev.filter((c) => c.sourceId !== prepared.id),
+        ...optimisticChunks,
       ]);
       setActiveSourceDetail((prev) =>
-        prev && prev.id === persistedSource.id ? persistedSource : prev
+        prev && prev.id === prepared.id ? prepared : prev
       );
       setEditingSource((prev) =>
-        prev && prev.id === persistedSource.id ? persistedSource : prev
+        prev && prev.id === prepared.id ? prepared : prev
       );
 
-      await publishArchiveToPublic(nextSources);
+      if (isVerifiedAuthorUser(auth.currentUser)) {
+        const { persistedSource, purgedAssetIds } = await saveSourceToCloud(
+          prepared,
+          previousSource,
+          otherSources
+        );
+        const allPurged = Array.from(
+          new Set([...localPurgedAssetIds, ...purgedAssetIds])
+        );
+
+        const finalChunks = await indexSource(persistedSource);
+        updateSourcesAndRef((prev) =>
+          prev.map((s) =>
+            s.id === prepared.id || s.id === persistedSource.id
+              ? persistedSource
+              : s
+          )
+        );
+        setVectorChunks((prev) => [
+          ...prev.filter(
+            (c) =>
+              c.sourceId !== prepared.id && c.sourceId !== persistedSource.id
+          ),
+          ...finalChunks,
+        ]);
+        setActiveSourceDetail((prev) =>
+          prev && (prev.id === prepared.id || prev.id === persistedSource.id)
+            ? persistedSource
+            : prev
+        );
+        setSyncedStats(computeLocalStats(sourcesRef.current));
+
+        await fetch('/api/archive/source', {
+          method: 'POST',
+          headers: getAdminHeaders(),
+          body: JSON.stringify({
+            source: persistedSource,
+            purgedAssetIds: allPurged,
+          }),
+        }).catch(() => {});
+
+        setSyncStatus('synced');
+      } else {
+        // Mirror to preview server immediately and queue permanent cloud write
+        const srvRes = await fetch('/api/archive/source', {
+          method: 'POST',
+          headers: getAdminHeaders(),
+          body: JSON.stringify({
+            source: prepared,
+            purgedAssetIds: localPurgedAssetIds,
+          }),
+        }).catch(() => null);
+
+        if (srvRes && srvRes.ok) {
+          const srvJson = await srvRes.json().catch(() => null);
+          if (srvJson?.source) {
+            const hydratedSrv: Source = {
+              ...prepared,
+              imageUrl: srvJson.source.imageUrl || undefined,
+              images:
+                Array.isArray(srvJson.source.images) &&
+                srvJson.source.images.length > 0
+                  ? srvJson.source.images
+                  : undefined,
+            };
+            await indexSource(hydratedSrv);
+            updateSourcesAndRef((prev) =>
+              prev.map((s) => (s.id === hydratedSrv.id ? hydratedSrv : s))
+            );
+            setActiveSourceDetail((prev) =>
+              prev && prev.id === hydratedSrv.id ? hydratedSrv : prev
+            );
+          }
+        }
+
+        enqueuePendingCloudMutation({
+          kind: 'upsert_source',
+          targetId: prepared.id,
+          timestamp: Date.now(),
+          purgedAssetIds: localPurgedAssetIds,
+        });
+        setPendingCloudCount(getPendingCloudMutations().length);
+        setSyncedStats(computeLocalStats(sourcesRef.current));
+        setSyncStatus('idle');
+        await handleConnectCloudAuthor();
+      }
     } catch (err) {
-      console.warn('Failed to update source:', err);
+      console.error('Failed to update source in cloud archive:', err);
+      enqueuePendingCloudMutation({
+        kind: 'upsert_source',
+        targetId: updatedSource.id,
+        timestamp: Date.now(),
+      });
+      setPendingCloudCount(getPendingCloudMutations().length);
+      setSyncErrorMessage(
+        'Chapter edit could not reach Cloud Firestore yet. Queued locally—click Retry to sync.'
+      );
+      setSyncStatus('error');
     }
   };
 
-  // Quick-attach one or more pictures to an existing source card (Google Studio Author Only)
+  // Default Cover Replacement: Uploading on a card replaces images[0] (the cover) and purges the old cover asset
   const handleAddPicturesToSource = async (
     targetSource: Source,
     dataUrls: string[]
   ) => {
     if (!isStudioBuildMode || dataUrls.length === 0) return;
-    try {
-      const existingImages = getSourceImages(targetSource);
-      const mergedImages = [...existingImages];
-      for (const url of dataUrls) {
-        if (url) {
-          const opt = await optimizeImageDataUrl(url);
-          if (opt && !mergedImages.includes(opt)) {
-            mergedImages.push(opt);
-          }
-        }
+    const latestTarget =
+      sourcesRef.current.find((s) => s.id === targetSource.id) || targetSource;
+    const existingImages = getSourceImages(latestTarget);
+
+    const incomingClean: string[] = [];
+    for (const url of dataUrls) {
+      if (url && !incomingClean.includes(url)) {
+        incomingClean.push(url);
       }
-      const updatedSource: Source = {
-        ...targetSource,
-        imageUrl: mergedImages[0] || undefined,
-        images: mergedImages.length > 0 ? mergedImages : undefined,
-        updatedAt: Date.now(),
-      };
-      await handleUpdateSource(updatedSource);
-    } catch (err) {
-      console.warn('Failed to add pictures to source:', err);
     }
+    if (incomingClean.length === 0) return;
+
+    // Replace primary cover (images[0]) while preserving any supplemental scans (existingImages.slice(1))
+    const nextImages =
+      existingImages.length > 0
+        ? [
+            ...incomingClean,
+            ...existingImages
+              .slice(1)
+              .filter((u) => !incomingClean.includes(u)),
+          ]
+        : incomingClean;
+
+    const updatedSource: Source = {
+      ...latestTarget,
+      imageUrl: nextImages[0] || undefined,
+      images: nextImages.length > 0 ? nextImages : undefined,
+      updatedAt: Date.now(),
+    };
+
+    await handleUpdateSource(updatedSource);
   };
 
-  // Remove a specific picture (or all pictures if imageIndex is omitted) from a source card
+  // Remove a specific picture (or all pictures if imageIndex is omitted) and purge its cloud/disk asset
   const handleRemovePictureFromSource = async (
     targetSource: Source,
     imageIndex?: number
   ) => {
     if (!isStudioBuildMode) return;
-    try {
-      const existingImages = getSourceImages(targetSource);
-      const remainingImages =
-        typeof imageIndex === 'number'
-          ? existingImages.filter((_, idx) => idx !== imageIndex)
-          : [];
-      const updatedSource: Source = {
-        ...targetSource,
-        imageUrl: remainingImages[0] || undefined,
-        images: remainingImages.length > 0 ? remainingImages : undefined,
-        updatedAt: Date.now(),
-      };
-      await handleUpdateSource(updatedSource);
-    } catch (err) {
-      console.warn('Failed to remove picture from source:', err);
-    }
+    const latestTarget =
+      sourcesRef.current.find((s) => s.id === targetSource.id) || targetSource;
+    const existingImages = getSourceImages(latestTarget);
+    const remainingImages =
+      typeof imageIndex === 'number'
+        ? existingImages.filter((_, idx) => idx !== imageIndex)
+        : [];
+
+    const updatedSource: Source = {
+      ...latestTarget,
+      imageUrl: remainingImages[0] || undefined,
+      images: remainingImages.length > 0 ? remainingImages : undefined,
+      updatedAt: Date.now(),
+    };
+
+    await handleUpdateSource(updatedSource);
   };
 
-  // Delete source and its vector chunks (Google Studio Author Only)
+  // Permanently delete card, record tombstone, and purge its image assets from Cloud Firestore & disk
   const handleDeleteSource = async (id: string) => {
     if (!isStudioBuildMode) return;
+    const previousSource =
+      sourcesRef.current.find((s) => s.id === id) || null;
+    const remainingSources = sourcesRef.current.filter((s) => s.id !== id);
+
+    setSyncStatus('syncing');
+    setSyncErrorMessage(null);
+
     try {
+      const candidateAssets = computeSupersededAssetIds(
+        previousSource,
+        { ...(previousSource || ({ id } as Source)), imageUrl: undefined, images: undefined, coverAssetId: undefined, assetIds: undefined },
+        remainingSources
+      );
+      for (const aid of candidateAssets) {
+        recordLocalDeletedAssetId(aid);
+      }
+
       await removeSourceFromDB(id, true);
-      const nextSources = sources.filter((s) => s.id !== id);
-      setSources(nextSources);
+      updateSourcesAndRef(remainingSources);
       setVectorChunks((prev) => prev.filter((c) => c.sourceId !== id));
       setSelectedSourceIds((prev) => prev.filter((itemId) => itemId !== id));
       setActiveSourceDetail((prev) => (prev && prev.id === id ? null : prev));
       setEditingSource((prev) => (prev && prev.id === id ? null : prev));
+      setSyncedStats(computeLocalStats(remainingSources));
 
-      setSyncStatus('syncing');
-      const res = await fetch(`/api/archive/source/${encodeURIComponent(id)}`, {
+      await fetch(`/api/archive/source/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: getAdminHeaders(),
-      });
-      if (res.ok) {
-        setSyncedStats(computeLocalStats(nextSources));
+      }).catch(() => {});
+
+      if (isVerifiedAuthorUser(auth.currentUser)) {
+        await deleteSourceFromCloud(id, previousSource, remainingSources);
         setSyncStatus('synced');
       } else {
-        await publishArchiveToPublic(nextSources);
+        enqueuePendingCloudMutation({
+          kind: 'delete_source',
+          targetId: id,
+          timestamp: Date.now(),
+          purgedAssetIds: candidateAssets,
+        });
+        setPendingCloudCount(getPendingCloudMutations().length);
+        setSyncStatus('idle');
+        await handleConnectCloudAuthor();
       }
     } catch (err) {
-      console.warn('Failed to delete source on server:', err);
+      console.error('Failed to delete source from cloud archive:', err);
+      enqueuePendingCloudMutation({
+        kind: 'delete_source',
+        targetId: id,
+        timestamp: Date.now(),
+      });
+      setPendingCloudCount(getPendingCloudMutations().length);
+      setSyncErrorMessage('Card deletion queued locally—click Retry to finalize in Firestore.');
       setSyncStatus('error');
     }
   };
@@ -690,34 +1104,60 @@ export default function App() {
   const handleSaveBookMetadata = async (newMetadata: BookMetadata) => {
     if (!isStudioBuildMode) return;
     setBookMetadata(newMetadata);
+    bookMetadataRef.current = newMetadata;
+    setSyncStatus('syncing');
+    setSyncErrorMessage(null);
+
     try {
       await fetch('/api/archive/metadata', {
         method: 'POST',
         headers: getAdminHeaders(),
         body: JSON.stringify({ bookMetadata: newMetadata }),
-      });
+      }).catch(() => {});
+
+      if (isVerifiedAuthorUser(auth.currentUser)) {
+        await saveBookMetadataToCloud(newMetadata);
+        setSyncStatus('synced');
+      } else {
+        enqueuePendingCloudMutation({
+          kind: 'save_metadata',
+          targetId: 'book_metadata',
+          timestamp: Date.now(),
+        });
+        setPendingCloudCount(getPendingCloudMutations().length);
+        setSyncStatus('idle');
+        await handleConnectCloudAuthor();
+      }
     } catch (err) {
-      console.warn('Failed to persist book metadata to server:', err);
+      console.error('Failed to persist book metadata to cloud:', err);
+      setSyncErrorMessage('Book settings could not sync to Firestore. Click Retry.');
+      setSyncStatus('error');
     }
   };
 
-  // Reset book metadata & archive to default (Google Studio Author Only)
+  // Reset book metadata & archive to default seed corpus (Google Studio Author Only)
   const handleResetToDefault = async () => {
     if (!isStudioBuildMode) return;
+    setSyncStatus('syncing');
+    setSyncErrorMessage(null);
     try {
       clearDeletedSourcesRegistry();
       setBookMetadata(defaultBookMetadata);
-      const allIndexedChunks: VectorChunk[] = [];
-      for (const s of seedSources) {
-        const chunks = await indexSource(s);
-        allIndexedChunks.push(...chunks);
-      }
-      setSources(seedSources);
+      bookMetadataRef.current = defaultBookMetadata;
+      const allIndexedChunks = await indexSourcesBatch(seedSources);
+      updateSourcesAndRef(seedSources);
       setVectorChunks(allIndexedChunks);
       setSelectedSourceIds(seedSources.map((s) => s.id));
-      await publishArchiveToPublic(seedSources, [], defaultBookMetadata);
+
+      if (isVerifiedAuthorUser(auth.currentUser)) {
+        await syncCloudForVerifiedAuthor(true);
+      } else {
+        await mirrorFullArchiveToServer(seedSources, [], defaultBookMetadata);
+        setSyncStatus('idle');
+      }
     } catch (err) {
       console.warn('Failed to reset archive:', err);
+      setSyncStatus('error');
     }
   };
 
@@ -751,13 +1191,20 @@ export default function App() {
     }
 
     // 1. Retrieve top matching vector passages from local vector store
+    const activeSources =
+      sourcesRef.current.length > 0 ? sourcesRef.current : seedSources;
     let searchResults: SearchResult[] = [];
     let citations: Citation[] = [];
 
     try {
+      const effectiveChunks =
+        vectorChunks.length > 0
+          ? vectorChunks
+          : activeSources.flatMap((s) => computeChunksForSource(s));
+
       searchResults = await semanticSearch(
         query,
-        vectorChunks,
+        effectiveChunks,
         selectedSourceIds.length > 0 ? selectedSourceIds : undefined,
         5
       );
@@ -780,7 +1227,7 @@ export default function App() {
         const localAnswer = synthesizeGroundedResponse(
           query,
           searchResults,
-          sources,
+          activeSources,
           isStudioBuildMode
         );
 
@@ -802,7 +1249,7 @@ export default function App() {
 
       // 3. Otherwise: Server-Side Gemini proxy with retrieved contexts and selected model tier
       const contexts = searchResults.map((sr, idx) => {
-        const parentSource = sources.find((s) => s.id === sr.chunk.sourceId);
+        const parentSource = activeSources.find((s) => s.id === sr.chunk.sourceId);
         return {
           id: sr.chunk.id,
           title: sr.chunk.sourceTitle,
@@ -860,7 +1307,7 @@ export default function App() {
         const fallbackReply = synthesizeGroundedResponse(
           query,
           searchResults,
-          sources,
+          activeSources,
           isStudioBuildMode
         );
         const assistantMessage: ChatMessage = {
@@ -896,7 +1343,7 @@ export default function App() {
       const fallbackReply = synthesizeGroundedResponse(
         query,
         searchResults,
-        sources,
+        activeSources,
         isStudioBuildMode
       );
       const fallbackMessage: ChatMessage = {
@@ -945,6 +1392,55 @@ export default function App() {
         syncedStats={syncedStats}
       />
 
+      {/* Studio-Only Author Cloud Auto-Save Bar (Strictly hidden on public shared ais-pre-* URLs) */}
+      {isStudioBuildMode &&
+        (cloudAuthState === 'unauthenticated' || syncStatus === 'error') && (
+          <div className="bg-[#FAF6F0] border-b border-[#EAE1D9] px-4 py-2 text-xs">
+            <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[#241B1C]">
+                {syncStatus === 'error' ? (
+                  <AlertCircle className="w-4 h-4 text-[#C83E0B] shrink-0" />
+                ) : (
+                  <CloudUpload className="w-4 h-4 text-[#C83E0B] shrink-0" />
+                )}
+                <span>
+                  {syncErrorMessage
+                    ? syncErrorMessage
+                    : pendingCloudCount > 0
+                    ? `Studio Author Mode: ${pendingCloudCount} chapter/asset edit${pendingCloudCount === 1 ? '' : 's'} ready to persist permanently to Cloud Firestore.`
+                    : `Studio Author Mode: Connect ${AUTHOR_EMAIL} once to enable automatic permanent Cloud Firestore saving for all chapter edits & cover replacements.`}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {cloudAuthState === 'unauthenticated' ? (
+                  <button
+                    type="button"
+                    onClick={() => handleConnectCloudAuthor()}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#C83E0B] hover:bg-[#A93207] text-white font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <CloudUpload className="w-3.5 h-3.5" />
+                    <span>Connect Cloud Auto-Save</span>
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => publishArchiveToPublic()}
+                    disabled={syncStatus === 'syncing'}
+                    className="px-3.5 py-1.5 rounded-lg bg-[#C83E0B] hover:bg-[#A93207] text-white font-semibold transition-colors flex items-center gap-1.5 cursor-pointer"
+                  >
+                    {syncStatus === 'syncing' ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-3.5 h-3.5" />
+                    )}
+                    <span>Retry Cloud Save</span>
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
       {/* VIEW: Dedicated References & Archive Repository Page */}
       {currentView === 'archive' && (
         <ArchivePageView
@@ -989,6 +1485,12 @@ export default function App() {
           }
           syncStatus={syncStatus}
           syncedStats={syncedStats}
+          cloudAuthState={cloudAuthState}
+          onConnectCloudAuthor={
+            isStudioBuildMode ? handleConnectCloudAuthor : undefined
+          }
+          pendingCloudCount={pendingCloudCount}
+          syncErrorMessage={syncErrorMessage}
         />
       )}
 

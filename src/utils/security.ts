@@ -1,11 +1,13 @@
 /**
  * Security, Privacy & Input Sanitization Utilities
  * Protects against unsafe URI schemes (XSS via javascript:/data:text/html),
+ * supports modern raster formats (AVIF, HEIC, WebP, PNG, JPEG),
  * enforces Studio Admin header construction, and guards protected manuscript excerpts.
  */
 
 const SAFE_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:']);
-const SAFE_DATA_IMAGE_PREFIX = /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);(base64,|utf8,)/i;
+const SAFE_DATA_IMAGE_PREFIX =
+  /^data:image\/(png|jpeg|jpg|webp|gif|avif|heic|heif|bmp|svg\+xml);(base64,|utf8,)/i;
 
 /**
  * Validates and sanitizes an external URL before rendering in <a href="...">
@@ -16,7 +18,11 @@ export function sanitizeExternalUrl(rawUrl?: string | null): string | undefined 
   const trimmed = rawUrl.trim().replace(/[\u0000-\u001F\u007F]/g, '');
   if (!trimmed) return undefined;
 
-  if (trimmed.startsWith('/assets/') || trimmed.startsWith('#')) {
+  if (
+    trimmed.startsWith('/assets/') ||
+    trimmed.startsWith('/api/assets/') ||
+    trimmed.startsWith('#')
+  ) {
     return trimmed;
   }
 
@@ -33,7 +39,8 @@ export function sanitizeExternalUrl(rawUrl?: string | null): string | undefined 
 
 /**
  * Validates and sanitizes an image source before rendering in <img src="...">
- * Allows https://, http://, local /assets/ paths, and safe raster/SVG data:image/* URIs.
+ * Allows https://, http://, local /assets/ and /api/assets/ paths,
+ * and safe raster/SVG data:image/* URIs (including AVIF and HEIC).
  */
 export function sanitizeImageSrc(rawSrc?: string | null): string | undefined {
   if (!rawSrc || typeof rawSrc !== 'string') return undefined;
@@ -84,6 +91,7 @@ export function getStudioAdminHeaders(): Record<string, string> {
     'Content-Type': 'application/json',
     Accept: 'application/json',
     'x-studio-admin': 'true',
+    'x-studio-author': 'true',
     'x-client-hostname': hostname,
   };
 }

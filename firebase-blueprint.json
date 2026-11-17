@@ -1,0 +1,432 @@
+{
+  "entities": {
+    "ArchiveSource": {
+      "title": "ArchiveSource",
+      "description": "Publicly readable metadata, summary, and cover asset references for a manuscript chapter, Substack article, archival scan, or bibliographic citation.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Deterministic or generated source identifier matching document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "description": "Title of the chapter, article, note, or literature citation.",
+          "minLength": 1,
+          "maxLength": 320
+        },
+        "type": {
+          "type": "string",
+          "description": "Classification of archive entry.",
+          "enum": ["chapter", "article", "note", "scan", "citation", "book"],
+          "minLength": 3,
+          "maxLength": 16
+        },
+        "section": {
+          "type": "string",
+          "description": "Display section in the Literature view.",
+          "enum": ["authored", "references"],
+          "minLength": 8,
+          "maxLength": 16
+        },
+        "author": {
+          "type": "string",
+          "description": "Author attribution for the chapter or external reference.",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "year": {
+          "type": "string",
+          "description": "Publication or draft year.",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "reference": {
+          "type": "string",
+          "description": "Chapter designation, page numbers, or DOI citation.",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "summary": {
+          "type": "string",
+          "description": "Publicly visible vetted summary or key quotation.",
+          "minLength": 0,
+          "maxLength": 4000
+        },
+        "content": {
+          "type": "string",
+          "description": "Publicly shareable passage text when isProtected is false, or public excerpt when isProtected is true.",
+          "minLength": 0,
+          "maxLength": 250000
+        },
+        "externalUrl": {
+          "type": "string",
+          "description": "Optional external HTTPS URL to Substack essay, publisher page, or DOI.",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "Primary cover URL (/api/assets/{assetId}, /assets/..., or external https:// URL).",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "images": {
+          "type": "array",
+          "description": "Ordered list of up to 24 normalized image URLs with index 0 as primary cover."
+        },
+        "coverAssetId": {
+          "type": "string",
+          "description": "Content-addressed asset ID of the primary cover stored in archive_assets.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "assetIds": {
+          "type": "array",
+          "description": "Ordered list of up to 24 content-addressed asset IDs referenced by this source."
+        },
+        "ocrDetectedPage": {
+          "type": "string",
+          "description": "Optional detected folio/page number from OCR.",
+          "minLength": 1,
+          "maxLength": 40
+        },
+        "ocrDocumentType": {
+          "type": "string",
+          "description": "Optional archival specimen classification from OCR.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "tags": {
+          "type": "array",
+          "description": "Bounded list of up to 25 thematic tags."
+        },
+        "isProtected": {
+          "type": "boolean",
+          "description": "Whether full raw manuscript body text is shielded in private_content."
+        },
+        "isPublished": {
+          "type": "boolean",
+          "description": "Whether this entry is visible on the public website."
+        },
+        "authorUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the verified author who created/owns this entry.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server last-modified timestamp."
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "type",
+        "section",
+        "summary",
+        "tags",
+        "isProtected",
+        "isPublished",
+        "authorUid",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PrivateSourceContent": {
+      "title": "PrivateSourceContent",
+      "description": "Copyright-protected raw manuscript chapter text and verbatim OCR transcription isolated from public reads.",
+      "type": "object",
+      "properties": {
+        "sourceId": {
+          "type": "string",
+          "description": "Parent source ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "rawContent": {
+          "type": "string",
+          "description": "Full raw manuscript text edited by the author.",
+          "minLength": 0,
+          "maxLength": 300000
+        },
+        "rawTranscription": {
+          "type": "string",
+          "description": "Optional full OCR transcription.",
+          "minLength": 0,
+          "maxLength": 250000
+        },
+        "authorUid": {
+          "type": "string",
+          "description": "Verified author UID.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": ["sourceId", "rawContent", "authorUid", "createdAt", "updatedAt"]
+    },
+    "ArchiveAsset": {
+      "title": "ArchiveAsset",
+      "description": "Content-addressed optimized image asset backing chapter covers and archival scans, purged automatically when replaced.",
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "description": "Content-addressed asset hash ID matching document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "sourceId": {
+          "type": "string",
+          "description": "Primary source ID that uploaded this asset.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "mimeType": {
+          "type": "string",
+          "description": "Normalized safe image MIME type.",
+          "enum": ["image/jpeg", "image/png", "image/webp", "image/svg+xml"],
+          "minLength": 9,
+          "maxLength": 24
+        },
+        "dataBase64": {
+          "type": "string",
+          "description": "Base64-encoded binary payload bounded strictly below Firestore 1MiB document limit.",
+          "minLength": 16,
+          "maxLength": 850000
+        },
+        "byteLength": {
+          "type": "number",
+          "description": "Decoded byte size of the image binary."
+        },
+        "width": {
+          "type": "number",
+          "description": "Optional pixel width."
+        },
+        "height": {
+          "type": "number",
+          "description": "Optional pixel height."
+        },
+        "isPublished": {
+          "type": "boolean",
+          "description": "Whether the asset can be served to public readers."
+        },
+        "authorUid": {
+          "type": "string",
+          "description": "Verified author UID.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "assetId",
+        "sourceId",
+        "mimeType",
+        "dataBase64",
+        "byteLength",
+        "isPublished",
+        "authorUid",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "ArchiveTombstone": {
+      "title": "ArchiveTombstone",
+      "description": "Permanent deletion record preventing deleted seed chapters, literature entries, or purged image assets from reappearing.",
+      "type": "object",
+      "properties": {
+        "targetId": {
+          "type": "string",
+          "description": "Deleted sourceId or assetId matching document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "kind": {
+          "type": "string",
+          "description": "Type of deleted artifact.",
+          "enum": ["source", "asset"],
+          "minLength": 5,
+          "maxLength": 10
+        },
+        "isPublished": {
+          "type": "boolean",
+          "description": "Publicly readable so both Studio and public server filter deleted IDs."
+        },
+        "authorUid": {
+          "type": "string",
+          "description": "Verified author UID.",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Deletion creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Deletion update timestamp."
+        }
+      },
+      "required": ["targetId", "kind", "isPublished", "authorUid", "createdAt", "updatedAt"]
+    },
+    "ArchiveConfig": {
+      "title": "ArchiveConfig",
+      "description": "Global publication metadata for The Truth About Love.",
+      "type": "object",
+      "properties": {
+        "configId": {
+          "type": "string",
+          "description": "Configuration document identifier (book_metadata).",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "subtitle": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 320
+        },
+        "author": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "authorRole": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 200
+        },
+        "authorBio": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 4000
+        },
+        "isbn": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "publisher": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 160
+        },
+        "publicationYear": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "description": {
+          "type": "string",
+          "minLength": 0,
+          "maxLength": 4000
+        },
+        "coverAccent": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        },
+        "purchaseUrl": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2048
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "authorUid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "configId",
+        "title",
+        "subtitle",
+        "author",
+        "authorRole",
+        "authorBio",
+        "publicationYear",
+        "description",
+        "coverAccent",
+        "isPublished",
+        "authorUid",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/archive_sources/{sourceId}": {
+      "schema": { "$ref": "#/entities/ArchiveSource" },
+      "description": "Publicly readable manuscript chapters, Substack essays, and literature citations."
+    },
+    "/archive_sources/{sourceId}/private_content/{contentId}": {
+      "schema": { "$ref": "#/entities/PrivateSourceContent" },
+      "description": "Author-restricted raw manuscript chapters and full OCR transcriptions."
+    },
+    "/archive_assets/{assetId}": {
+      "schema": { "$ref": "#/entities/ArchiveAsset" },
+      "description": "Content-addressed JPEG/WebP/PNG/SVG image assets backing archive cards."
+    },
+    "/archive_tombstones/{targetId}": {
+      "schema": { "$ref": "#/entities/ArchiveTombstone" },
+      "description": "Permanent tombstone records for deleted entries and purged image assets."
+    },
+    "/archive_config/{configId}": {
+      "schema": { "$ref": "#/entities/ArchiveConfig" },
+      "description": "Global book metadata configuration."
+    }
+  }
+}

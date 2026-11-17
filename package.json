@@ -3,9 +3,13 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=22.18.0"
+  },
   "scripts": {
     "dev": "tsx server.ts",
     "build": "vite build",
+    "gcp-build": "vite build",
     "start": "node server.ts",
     "preview": "node server.ts",
     "clean": "rm -rf dist server.js",
@@ -13,27 +17,30 @@
   },
   "dependencies": {
     "@google/genai": "^2.32.0",
+    "@tailwindcss/vite": "^4.3.3",
+    "@vitejs/plugin-react": "^6.1.1",
     "dotenv": "^17.2.3",
     "express": "^4.21.2",
+    "firebase": "^12.10.0",
     "lucide-react": "^0.546.0",
     "motion": "^12.23.24",
     "react": "^19.0.1",
-    "react-dom": "^19.0.1"
+    "react-dom": "^19.0.1",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.0"
   },
   "devDependencies": {
-    "@tailwindcss/vite": "^4.3.3",
+    "@firebase/eslint-plugin-security-rules": "^0.0.2",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@types/ws": "^8.18.2",
-    "@vitejs/plugin-react": "^6.1.1",
     "autoprefixer": "^10.4.21",
-    "esbuild": "^0.25.0",
-    "tailwindcss": "^4.3.3",
+    "esbuild": "^0.28.0",
+    "eslint": "^10.15.0",
     "tsx": "^4.21.0",
-    "typescript": "^7.0.2",
-    "vite": "^8.3.0",
-    "ws": "^8.22.1"
+    "typescript": "~5.8.3",
+    "ws": "^8.18.0"
   }
 }

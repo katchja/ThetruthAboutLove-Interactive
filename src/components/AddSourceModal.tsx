@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Source, SourceType, ArchiveSection } from '../types';
 import { getStudioAdminHeaders } from '../utils/security';
+import { readUploadedImageFileAsDataUrl } from '../utils/imagePipeline';
 
 interface AddSourceModalProps {
   isOpen: boolean;
@@ -87,14 +88,23 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onload = async (event) => {
-        const base64 = event.target?.result as string;
-        setImagePreview(base64);
-        await runOCR(base64, file.type, file.name);
-      };
-      reader.readAsDataURL(file);
+    const isImage =
+      file.type.startsWith('image/') ||
+      /\.(avif|heic|heif|webp|png|jpe?g|gif|bmp|svg)$/i.test(file.name);
+
+    if (isImage) {
+      try {
+        const normalizedDataUrl = await readUploadedImageFileAsDataUrl(file);
+        if (normalizedDataUrl) {
+          setImagePreview(normalizedDataUrl);
+          const resolvedMime = normalizedDataUrl.startsWith('data:image/svg')
+            ? 'image/svg+xml'
+            : 'image/jpeg';
+          await runOCR(normalizedDataUrl, resolvedMime, file.name);
+        }
+      } catch (err) {
+        console.warn('Scan image decode warning:', err);
+      }
     } else if (file.type === 'text/plain' || file.name.endsWith('.md')) {
       const reader = new FileReader();
       reader.onload = (event) => {
@@ -445,11 +455,11 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
                     Click to upload scan, manuscript photo, or book page
                   </span>
                   <span className="text-[11px] text-[#8C7A7D] mt-0.5">
-                    PNG, JPG, WEBP • Automatically transcribed and indexed
+                    JPG, PNG, WEBP, AVIF, HEIC • Automatically transcribed and cloud-saved
                   </span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/*,image/avif,image/heic,image/heif,.avif,.heic,.heif"
                     onChange={handleFileChange}
                     className="hidden"
                   />
@@ -559,7 +569,6 @@ export const AddSourceModal: React.FC<AddSourceModalProps> = ({
               {activeTab === 'scan' ? 'Transcribed Text (Indexed for Vectors) *' : 'Content / Excerpt Passages *'}
             </label>
             <textarea
-              required
               rows={5}
               value={content}
               onChange={(e) => setContent(e.target.value)}

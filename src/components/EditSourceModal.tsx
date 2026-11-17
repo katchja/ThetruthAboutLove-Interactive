@@ -24,6 +24,7 @@ import {
   getSourceImages,
 } from '../types';
 import { getStudioAdminHeaders } from '../utils/security';
+import { readUploadedImageFileAsDataUrl } from '../utils/imagePipeline';
 
 interface EditSourceModalProps {
   source: Source | null;
@@ -65,6 +66,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
   const [images, setImages] = useState<string[]>([]);
   const [newImageUrlInput, setNewImageUrlInput] = useState('');
   const [isLoadingOCR, setIsLoadingOCR] = useState(false);
+  const [isDecodingImage, setIsDecodingImage] = useState(false);
 
   // OCR metadata state
   const [ocrTranscription, setOcrTranscription] = useState('');
@@ -98,25 +100,81 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
 
   if (!isOpen || !source) return null;
 
-  const handleImageFilesUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const isLikelyImageFile = (file: File) =>
+    file.type.startsWith('image/') ||
+    /\.(avif|heic|heif|webp|png|jpe?g|gif|bmp|svg)$/i.test(file.name);
+
+  // Default behavior: replace primary cover (images[0]) so superseded cover is purged on Save
+  const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-
-    Array.from(files).forEach((file) => {
-      if (!file.type.startsWith('image/')) return;
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        const base64 = event.target?.result as string;
-        if (base64) {
-          setImages((prev) => (prev.includes(base64) ? prev : [...prev, base64]));
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    const selected = Array.from(files).filter(isLikelyImageFile);
     e.target.value = '';
+    if (selected.length === 0) return;
+
+    setIsDecodingImage(true);
+    try {
+      const decoded: string[] = [];
+      for (const file of selected) {
+        const dataUrl = await readUploadedImageFileAsDataUrl(file);
+        if (dataUrl && !decoded.includes(dataUrl)) {
+          decoded.push(dataUrl);
+        }
+      }
+      if (decoded.length > 0) {
+        setImages((prev) => {
+          const rest = prev.slice(1).filter((u) => !decoded.includes(u));
+          return [...decoded, ...rest];
+        });
+      }
+    } catch (err) {
+      console.warn('Cover decode warning:', err);
+    } finally {
+      setIsDecodingImage(false);
+    }
   };
 
-  const handleAddImageUrl = () => {
+  // Secondary option: append supplemental archival scan without overwriting cover
+  const handleSupplementalUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const selected = Array.from(files).filter(isLikelyImageFile);
+    e.target.value = '';
+    if (selected.length === 0) return;
+
+    setIsDecodingImage(true);
+    try {
+      const decoded: string[] = [];
+      for (const file of selected) {
+        const dataUrl = await readUploadedImageFileAsDataUrl(file);
+        if (dataUrl && !decoded.includes(dataUrl)) {
+          decoded.push(dataUrl);
+        }
+      }
+      if (decoded.length > 0) {
+        setImages((prev) => {
+          const merged = [...prev];
+          for (const d of decoded) {
+            if (!merged.includes(d)) merged.push(d);
+          }
+          return merged;
+        });
+      }
+    } catch (err) {
+      console.warn('Supplemental scan decode warning:', err);
+    } finally {
+      setIsDecodingImage(false);
+    }
+  };
+
+  const handleSetCoverUrl = () => {
+    const trimmed = newImageUrlInput.trim();
+    if (!trimmed) return;
+    setImages((prev) => [trimmed, ...prev.slice(1).filter((u) => u !== trimmed)]);
+    setNewImageUrlInput('');
+  };
+
+  const handleAppendImageUrl = () => {
     const trimmed = newImageUrlInput.trim();
     if (!trimmed) return;
     setImages((prev) => (prev.includes(trimmed) ? prev : [...prev, trimmed]));
@@ -127,21 +185,25 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
     setImages((prev) => prev.filter((_, i) => i !== index));
   };
 
-  const handleReplaceImageFile = (
+  const handleReplaceImageFile = async (
     index: number,
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
     const file = e.target.files?.[0];
-    if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const base64 = event.target?.result as string;
-      if (base64) {
-        setImages((prev) => prev.map((img, i) => (i === index ? base64 : img)));
-      }
-    };
-    reader.readAsDataURL(file);
     e.target.value = '';
+    if (!file || !isLikelyImageFile(file)) return;
+
+    setIsDecodingImage(true);
+    try {
+      const dataUrl = await readUploadedImageFileAsDataUrl(file);
+      if (dataUrl) {
+        setImages((prev) => prev.map((img, i) => (i === index ? dataUrl : img)));
+      }
+    } catch (err) {
+      console.warn('Replace picture decode warning:', err);
+    } finally {
+      setIsDecodingImage(false);
+    }
   };
 
   const handleMakePrimaryImage = (index: number) => {
@@ -208,6 +270,12 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
 
     setIsSaving(true);
     try {
+      // Auto-commit any pasted URL in newImageUrlInput as the cover if Save was clicked directly
+      const pendingUrl = newImageUrlInput.trim();
+      const effectiveImages = pendingUrl
+        ? [pendingUrl, ...images.slice(1).filter((u) => u !== pendingUrl)]
+        : images;
+
       const parsedTags = tagsInput
         .split(',')
         .map((t) => t.trim().replace(/^#/, ''))
@@ -239,8 +307,8 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
         content: effectiveContent,
         tags: parsedTags.length > 0 ? parsedTags : ['Catalina Butnaru'],
         isProtected,
-        imageUrl: images[0] || undefined,
-        images: images.length > 0 ? images : undefined,
+        imageUrl: effectiveImages[0] || undefined,
+        images: effectiveImages.length > 0 ? effectiveImages : undefined,
         ocrData: hasOcr
           ? {
               rawTranscription:
@@ -255,6 +323,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
       };
 
       await onSaveSource(updatedSource);
+      setNewImageUrlInput('');
       onClose();
     } catch (err) {
       console.error('Failed to save edited source:', err);
@@ -434,14 +503,14 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
               <div>
                 <h3 className="text-xs font-bold text-[#241B1C] flex items-center gap-1.5">
                   <ImageIcon className="w-4 h-4 text-[#C83E0B]" />
-                  <span>Card Pictures &amp; Archival Scans ({images.length})</span>
+                  <span>Chapter Cover &amp; Archival Scans ({images.length})</span>
                 </h3>
                 <p className="text-[11px] text-[#8C7A7D]">
-                  Upload pictures or manuscript scans for this card. The first picture is shown as the primary cover thumbnail.
+                  Uploading a new cover automatically replaces the primary cover and purges the superseded asset on save (supports JPG, PNG, WebP, AVIF, HEIC).
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {images.length > 0 && (
                   <button
                     type="button"
@@ -457,44 +526,81 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                     ) : (
                       <>
                         <Sparkles className="w-3 h-3" />
-                        <span>Transcribe Picture (OCR)</span>
+                        <span>Transcribe Cover (OCR)</span>
                       </>
                     )}
                   </button>
                 )}
 
                 <label className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-semibold cursor-pointer shadow-xs transition-colors">
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>Upload Picture(s)</span>
+                  {isDecodingImage ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      <span>Optimizing...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="w-3.5 h-3.5" />
+                      <span>{images.length > 0 ? 'Replace Cover' : 'Upload Cover'}</span>
+                    </>
+                  )}
                   <input
                     type="file"
-                    accept="image/*"
-                    multiple
-                    onChange={handleImageFilesUpload}
+                    accept="image/*,image/avif,image/heic,image/heif,.avif,.heic,.heif"
+                    onChange={handleCoverUpload}
                     className="hidden"
                   />
                 </label>
+
+                {images.length > 0 && (
+                  <label
+                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-[#EAE1D9] bg-[#FDFCFA] hover:border-[#C83E0B] text-[#241B1C] text-[11px] font-medium cursor-pointer transition-colors"
+                    title="Append an additional archival scan without replacing the primary cover"
+                  >
+                    <Plus className="w-3 h-3 text-[#C83E0B]" />
+                    <span>Supplemental Scan</span>
+                    <input
+                      type="file"
+                      accept="image/*,image/avif,image/heic,image/heif,.avif,.heic,.heif"
+                      multiple
+                      onChange={handleSupplementalUpload}
+                      className="hidden"
+                    />
+                  </label>
+                )}
               </div>
             </div>
 
-            {/* Add Picture by URL */}
+            {/* Set Cover or Add Picture by URL */}
             <div className="flex items-center gap-2">
               <input
                 type="text"
                 value={newImageUrlInput}
                 onChange={(e) => setNewImageUrlInput(e.target.value)}
-                placeholder="Or paste an image URL / data URI..."
+                placeholder="Or paste an image URL to set as cover..."
                 className="flex-1 px-3 py-1.5 rounded-lg border border-[#E0D4CB] bg-[#FDFCFA] text-xs text-[#2A2022] focus:ring-1 focus:ring-[#C83E0B]"
               />
               <button
                 type="button"
-                onClick={handleAddImageUrl}
+                onClick={handleSetCoverUrl}
                 disabled={!newImageUrlInput.trim()}
                 className="px-3 py-1.5 rounded-lg border border-[#EAE1D9] bg-[#FDFCFA] hover:border-[#C83E0B] text-[#241B1C] disabled:opacity-40 text-xs font-medium flex items-center gap-1"
               >
-                <Plus className="w-3.5 h-3.5 text-[#C83E0B]" />
-                <span>Add URL</span>
+                <Check className="w-3.5 h-3.5 text-[#C83E0B]" />
+                <span>Set as Cover</span>
               </button>
+              {images.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleAppendImageUrl}
+                  disabled={!newImageUrlInput.trim()}
+                  className="px-2.5 py-1.5 rounded-lg border border-[#EAE1D9] bg-[#FDFCFA] hover:border-[#C83E0B] text-[#635154] disabled:opacity-40 text-xs font-medium flex items-center gap-1"
+                  title="Append URL as supplemental scan"
+                >
+                  <Plus className="w-3.5 h-3.5 text-[#C83E0B]" />
+                  <span>Append</span>
+                </button>
+              )}
             </div>
 
             {/* Thumbnails gallery */}
@@ -538,7 +644,7 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
                         <span>Replace</span>
                         <input
                           type="file"
-                          accept="image/*"
+                          accept="image/*,image/avif,image/heic,image/heif,.avif,.heic,.heif"
                           onChange={(e) => handleReplaceImageFile(idx, e)}
                           className="hidden"
                         />
@@ -583,7 +689,6 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
               </span>
             </div>
             <textarea
-              required
               rows={8}
               value={content}
               onChange={(e) => setContent(e.target.value)}
@@ -728,13 +833,13 @@ export const EditSourceModal: React.FC<EditSourceModalProps> = ({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={isSaving || !title.trim() || !content.trim()}
+              disabled={isSaving || isDecodingImage || !title.trim()}
               className="inline-flex items-center gap-1.5 px-5 py-2 rounded-xl bg-[#C83E0B] hover:bg-[#A93207] disabled:opacity-50 text-white text-xs font-semibold shadow-md shadow-[#C83E0B]/25 transition-colors"
             >
               {isSaving ? (
                 <>
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  <span>Saving &amp; Re-Indexing...</span>
+                  <span>Auto-Saving to Cloud...</span>
                 </>
               ) : (
                 <>

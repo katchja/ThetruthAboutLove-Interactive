@@ -1,11 +1,22 @@
 import express from 'express';
 import http from 'http';
 import fs from 'fs';
+import os from 'os';
 import crypto from 'crypto';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, HarmCategory, HarmBlockThreshold } from '@google/genai';
+import { initializeApp as initFirebaseServerApp } from 'firebase/app';
+import {
+  getFirestore as getServerFirestore,
+  collection as fsCollection,
+  doc as fsDoc,
+  getDoc as fsGetDoc,
+  getDocs as fsGetDocs,
+  query as fsQuery,
+  where as fsWhere,
+} from 'firebase/firestore';
 
 dotenv.config();
 
@@ -16,10 +27,14 @@ const app = express();
 const server = http.createServer(app);
 const port = parseInt(process.env.PORT || '3000', 10);
 const isDevCommand = process.env.npm_lifecycle_event === 'dev';
+const isCloudRun = Boolean(process.env.K_SERVICE || process.env.K_REVISION);
 const isProd =
   !isDevCommand &&
-  (process.env.NODE_ENV === 'production' ||
-    process.env.npm_lifecycle_event === 'start');
+  (isCloudRun ||
+    process.env.NODE_ENV === 'production' ||
+    process.env.npm_lifecycle_event === 'start' ||
+    process.env.npm_lifecycle_event === 'preview' ||
+    fs.existsSync(path.resolve(__dirname, 'dist', 'index.html')));
 
 // ============================================================================
 // 1. SECURITY HEADERS & SCOPED BODY PARSERS
@@ -118,7 +133,8 @@ const adminRateLimiter = createRateLimiter(300, 60 * 1000); // 300 admin actions
 // 3. URL, IMAGE & SCHEMA SANITIZATION HELPERS
 // ============================================================================
 const SAFE_EXTERNAL_PROTOCOLS = new Set(['https:', 'http:']);
-const SAFE_DATA_IMAGE_PREFIX = /^data:image\/(png|jpeg|jpg|webp|gif|svg\+xml);(base64,|utf8,)/i;
+const SAFE_DATA_IMAGE_PREFIX =
+  /^data:image\/(png|jpeg|jpg|webp|gif|avif|heic|heif|bmp|svg\+xml);(base64,|utf8,)/i;
 const VALID_SOURCE_TYPES = new Set([
   'chapter',
   'article',
@@ -132,7 +148,11 @@ function sanitizeExternalUrl(rawUrl: unknown): string | undefined {
   if (typeof rawUrl !== 'string') return undefined;
   const trimmed = rawUrl.trim().replace(/[\u0000-\u001F\u007F]/g, '').slice(0, 2048);
   if (!trimmed) return undefined;
-  if (trimmed.startsWith('/assets/') || trimmed.startsWith('#')) {
+  if (
+    trimmed.startsWith('/assets/') ||
+    trimmed.startsWith('/api/assets/') ||
+    trimmed.startsWith('#')
+  ) {
     return trimmed;
   }
   try {
@@ -226,10 +246,19 @@ function isStudioAdminRequest(req: express.Request): boolean {
 // ============================================================================
 // 5. GEMINI CLIENT & TIMEOUT HELPER
 // ============================================================================
+function getResolvedGeminiApiKey(): string {
+  return (
+    process.env.GEMINI_API_KEY ||
+    process.env.GOOGLE_API_KEY ||
+    process.env.API_KEY ||
+    ''
+  ).trim();
+}
+
 function getGenAI(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = getResolvedGeminiApiKey();
   return new GoogleGenAI({
-    apiKey: apiKey || '',
+    ...(apiKey ? { apiKey } : {}),
     httpOptions: {
       headers: {
         'User-Agent': 'aistudio-build',
@@ -255,8 +284,9 @@ function withTimeout<T>(promise: Promise<T>, ms: number, label = 'Gemini API'): 
   });
 }
 
-// Strictly locked to free-tier Gemini Flash-Lite (gemini-3.1-flash-lite)
-const FREE_CHAT_MODEL = 'gemini-3.1-flash-lite';
+// Primary free-tier Gemini Flash-Lite with automatic fallback to Gemini 4 Hydrogen
+const FREE_CHAT_MODELS = ['gemini-3.1-flash-lite', 'gemini-4-hydrogen'] as const;
+const FREE_CHAT_MODEL = FREE_CHAT_MODELS[0];
 
 // ============================================================================
 // 5B. SERVER-SIDE CONVERSATIONAL GUARDRAIL & SANDBOX HELPERS
@@ -507,53 +537,77 @@ INTELLECTUAL PROPERTY, SCOPE & ANTI-INJECTION GUARDRAILS:
     });
 
     const timeoutMs = 15000;
+    const safetySettings = [
+      {
+        category: HarmCategory.HARM_CATEGORY_HARASSMENT,
+        threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+        threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+        threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+      },
+      {
+        category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+        threshold: HarmBlockThreshold.BLOCK_ONLY_HIGH,
+      },
+    ];
 
-    // LAYER 3: Gemini Execution with Explicit HarmCategory Safety Thresholds
-    const response = await withTimeout(
-      ai.models.generateContent({
-        model: selectedModel,
-        contents,
-        config: {
-          systemInstruction,
-          safetySettings: [
-            {
-              category: HarmCategory.HARM_CATEGORY_HARASSMENT,
-              threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
+    // LAYER 3: Gemini Execution with Automatic Model Fallback
+    let rawReply = '';
+    let usedModel: string = selectedModel;
+    let lastGenError: any = null;
+
+    for (const candidateModel of FREE_CHAT_MODELS) {
+      try {
+        const response = await withTimeout(
+          ai.models.generateContent({
+            model: candidateModel,
+            contents,
+            config: {
+              systemInstruction,
+              safetySettings,
             },
-            {
-              category: HarmCategory.HARM_CATEGORY_HATE_SPEECH,
-              threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-            },
-            {
-              category: HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
-              threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-            },
-            {
-              category: HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
-              threshold: HarmBlockThreshold.BLOCK_LOW_AND_ABOVE,
-            },
-          ],
-        },
-      }),
-      timeoutMs,
-      `Chat API (${selectedModel})`
-    );
+          }),
+          timeoutMs,
+          `Chat API (${candidateModel})`
+        );
+        const text = (response.text || '').trim();
+        if (text) {
+          rawReply = text;
+          usedModel = candidateModel;
+          break;
+        }
+      } catch (modelErr: any) {
+        lastGenError = modelErr;
+        console.warn(`Chat model ${candidateModel} error:`, modelErr?.message || modelErr);
+      }
+    }
+
+    if (!rawReply && lastGenError) {
+      throw lastGenError;
+    }
 
     // LAYER 4: Post-Generation Output Verifier & Leak Scrubber
-    const rawReply =
-      response.text ||
+    const finalRaw =
+      rawReply ||
       'Unable to generate a synthesis for this inquiry. Please try rephrasing your question around the themes of The Truth About Love.';
-    const safeReply = scrubModelOutput(rawReply);
+    const safeReply = scrubModelOutput(finalRaw);
 
     res.json({
       reply: safeReply,
-      model: selectedModel,
+      model: usedModel,
       guardrailCategory: 'safe',
     });
   } catch (error: any) {
-    console.warn('Chat API fallback triggered:', error?.message);
+    const errMsg = error?.message || 'Failed to process chat query.';
+    console.warn('Chat API fallback triggered:', errMsg);
     res.status(500).json({
       error: 'Failed to process chat query.',
+      details: errMsg,
     });
   }
 });
@@ -615,7 +669,7 @@ Format your response as valid JSON with keys:
 
     const response = await withTimeout(
       ai.models.generateContent({
-        model: 'gemini-3.8-flash',
+        model: 'gemini-4-hydrogen',
         contents: {
           parts: [
             {
@@ -664,57 +718,149 @@ Format your response as valid JSON with keys:
 });
 
 // ============================================================================
-// 8. PERSISTENT ARCHIVE & PICTURE STORE (Atomic Writes, Backup & Schema Validation)
+// 8. PERSISTENT ARCHIVE & CLOUD FIRESTORE HYDRATION + CACHED ASSET STORE
 // ============================================================================
-const ARCHIVE_STORE_PATH = path.resolve(__dirname, 'archive-store.json');
-const CARDS_ASSETS_DIR = path.resolve(__dirname, 'public', 'assets', 'cards');
+const BUNDLED_ARCHIVE_STORE_PATH = path.resolve(__dirname, 'archive-store.json');
+const BUNDLED_CARDS_ASSETS_DIR = path.resolve(__dirname, 'public', 'assets', 'cards');
+const RUNTIME_CACHE_DIR = isProd
+  ? path.join(os.tmpdir(), 'truth-about-love-cache')
+  : __dirname;
+const WRITABLE_ARCHIVE_STORE_PATH = isProd
+  ? path.join(RUNTIME_CACHE_DIR, 'archive-store.json')
+  : BUNDLED_ARCHIVE_STORE_PATH;
+const CARDS_ASSETS_DIR = isProd
+  ? path.join(RUNTIME_CACHE_DIR, 'cards')
+  : BUNDLED_CARDS_ASSETS_DIR;
+const FIREBASE_CONFIG_PATH = path.resolve(__dirname, 'firebase-applet-config.json');
 
 interface PersistedArchiveStore {
   sources: any[];
   deletedIds: string[];
+  deletedAssetIds?: string[];
   bookMetadata?: any;
   updatedAt: number;
 }
 
 let cachedArchiveStore: PersistedArchiveStore | null = null;
+let lastFirestoreHydrationMs = 0;
+let inflightHydration: Promise<void> | null = null;
+const FIRESTORE_CACHE_TTL_MS = 20 * 1000;
 
-function persistDataImageToAsset(safeImg: string, sourceId = 'card', idx = 0): string {
+let serverFirestoreInstance: ReturnType<typeof getServerFirestore> | null | undefined;
+
+function getCloudFirestoreServer() {
+  if (serverFirestoreInstance !== undefined) {
+    return serverFirestoreInstance;
+  }
+  try {
+    if (!fs.existsSync(FIREBASE_CONFIG_PATH)) {
+      serverFirestoreInstance = null;
+      return null;
+    }
+    const cfg = JSON.parse(fs.readFileSync(FIREBASE_CONFIG_PATH, 'utf-8'));
+    if (!cfg?.projectId || !cfg?.apiKey) {
+      serverFirestoreInstance = null;
+      return null;
+    }
+    const fbApp = initFirebaseServerApp(cfg, 'server-hydrator');
+    serverFirestoreInstance = getServerFirestore(fbApp, cfg.firestoreDatabaseId);
+    return serverFirestoreInstance;
+  } catch (err) {
+    console.warn('Server Firestore initialization skipped:', err);
+    serverFirestoreInstance = null;
+    return null;
+  }
+}
+
+function extractServerAssetId(url: unknown): string | null {
+  if (typeof url !== 'string') return null;
+  const clean = url.split('?')[0].trim();
+  const m1 = clean.match(/^\/api\/assets\/([a-zA-Z0-9_-]{1,128})$/);
+  if (m1) return m1[1];
+  const m2 = clean.match(/^\/assets\/cards\/(asset-[a-zA-Z0-9_-]{1,120})\.[a-z0-9]+$/i);
+  if (m2) return m2[1];
+  return null;
+}
+
+function writeCachedAssetBinary(assetId: string, mimeType: string, buf: Buffer): void {
+  try {
+    if (!fs.existsSync(CARDS_ASSETS_DIR)) {
+      fs.mkdirSync(CARDS_ASSETS_DIR, { recursive: true });
+    }
+    const safeId = assetId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeId) return;
+    fs.writeFileSync(path.join(CARDS_ASSETS_DIR, `${safeId}.bin`), buf);
+    fs.writeFileSync(path.join(CARDS_ASSETS_DIR, `${safeId}.mime`), mimeType, 'utf-8');
+  } catch {}
+}
+
+function readCachedAssetBinary(assetId: string): { mimeType: string; buf: Buffer } | null {
+  try {
+    const safeId = assetId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeId) return null;
+    const dirsToCheck =
+      CARDS_ASSETS_DIR === BUNDLED_CARDS_ASSETS_DIR
+        ? [CARDS_ASSETS_DIR]
+        : [CARDS_ASSETS_DIR, BUNDLED_CARDS_ASSETS_DIR];
+    for (const dir of dirsToCheck) {
+      const binPath = path.join(dir, `${safeId}.bin`);
+      const mimePath = path.join(dir, `${safeId}.mime`);
+      if (fs.existsSync(binPath)) {
+        const buf = fs.readFileSync(binPath);
+        const mimeType = fs.existsSync(mimePath)
+          ? fs.readFileSync(mimePath, 'utf-8').trim() || 'image/jpeg'
+          : 'image/jpeg';
+        return { mimeType, buf };
+      }
+    }
+  } catch {}
+  return null;
+}
+
+function unlinkPurgedAssetFromDisk(assetId: string): void {
+  try {
+    const safeId = assetId.replace(/[^a-zA-Z0-9_-]/g, '');
+    if (!safeId || !fs.existsSync(CARDS_ASSETS_DIR)) return;
+    for (const suffix of ['.bin', '.mime', '.jpg', '.png', '.webp', '.svg']) {
+      const p = path.join(CARDS_ASSETS_DIR, `${safeId}${suffix}`);
+      if (fs.existsSync(p)) {
+        fs.unlinkSync(p);
+      }
+    }
+  } catch {}
+}
+
+function persistDataImageToAsset(safeImg: string): string {
   if (!safeImg.startsWith('data:image/')) {
     return safeImg;
   }
-  const match = safeImg.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+  const match = safeImg.match(/^data:(image\/[a-zA-Z0-9+.-]+);base64,(.+)$/i);
   if (!match) {
     return safeImg;
   }
   try {
-    let ext = match[1].toLowerCase();
-    if (ext === 'jpeg') ext = 'jpg';
-    if (ext === 'svg+xml') ext = 'svg';
+    const rawMime = match[1].toLowerCase();
+    const mimeType = rawMime === 'image/jpg' ? 'image/jpeg' : rawMime;
     const buf = Buffer.from(match[2], 'base64');
-    const hash = crypto.createHash('sha1').update(buf).digest('hex').slice(0, 10);
-    const safeId = String(sourceId || 'card').replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 48);
-    const filename = `${safeId}-${idx}-${hash}.${ext}`;
-    if (!fs.existsSync(CARDS_ASSETS_DIR)) {
-      fs.mkdirSync(CARDS_ASSETS_DIR, { recursive: true });
-    }
-    const targetPath = path.join(CARDS_ASSETS_DIR, filename);
-    if (!fs.existsSync(targetPath)) {
-      fs.writeFileSync(targetPath, buf);
-    }
-    return `/assets/cards/${filename}`;
+    // Content-addressed SHA-256 ID (independent of array index so reordering never duplicates)
+    const hex = crypto.createHash('sha256').update(buf).digest('hex').slice(0, 24);
+    const assetId = `asset-${hex}`;
+    writeCachedAssetBinary(assetId, mimeType, buf);
+    return `/api/assets/${assetId}`;
   } catch {
     return safeImg;
   }
 }
 
-function getNormalizedSourceImages(s: any): string[] {
+function getNormalizedSourceImages(s: any, deletedAssetSet?: Set<string>): string[] {
   const list: string[] = [];
-  const sourceId = s?.id || 'card';
   if (s && Array.isArray(s.images)) {
     for (let i = 0; i < s.images.length; i++) {
       const safe = sanitizeImageSrc(s.images[i]);
       if (safe) {
-        const persisted = persistDataImageToAsset(safe, sourceId, i);
+        const persisted = persistDataImageToAsset(safe);
+        const aid = extractServerAssetId(persisted);
+        if (aid && deletedAssetSet?.has(aid)) continue;
         if (!list.includes(persisted)) {
           list.push(persisted);
         }
@@ -723,8 +869,9 @@ function getNormalizedSourceImages(s: any): string[] {
   }
   const safePrimary = sanitizeImageSrc(s?.imageUrl);
   if (safePrimary) {
-    const persistedPrimary = persistDataImageToAsset(safePrimary, sourceId, 0);
-    if (!list.includes(persistedPrimary)) {
+    const persistedPrimary = persistDataImageToAsset(safePrimary);
+    const aid = extractServerAssetId(persistedPrimary);
+    if (!(aid && deletedAssetSet?.has(aid)) && !list.includes(persistedPrimary)) {
       list.unshift(persistedPrimary);
     }
   }
@@ -746,7 +893,7 @@ function getNormalizedSourceSection(s: any): 'authored' | 'references' {
   return 'references';
 }
 
-function sanitizeSourceRecord(raw: any): any | null {
+function sanitizeSourceRecord(raw: any, deletedAssetSet?: Set<string>): any | null {
   if (!raw || typeof raw !== 'object') return null;
   const id = clampString(raw.id, 140);
   const title = clampString(raw.title, 320);
@@ -755,8 +902,11 @@ function sanitizeSourceRecord(raw: any): any | null {
   const rawType = clampString(raw.type, 40, 'article');
   const type = VALID_SOURCE_TYPES.has(rawType) ? rawType : 'article';
   const section = getNormalizedSourceSection({ ...raw, type });
-  const images = getNormalizedSourceImages(raw);
+  const images = getNormalizedSourceImages(raw, deletedAssetSet);
   const externalUrl = sanitizeExternalUrl(raw.externalUrl);
+  const assetIds = images
+    .map((u) => extractServerAssetId(u))
+    .filter((a): a is string => Boolean(a));
 
   const tags = Array.isArray(raw.tags)
     ? raw.tags
@@ -791,6 +941,8 @@ function sanitizeSourceRecord(raw: any): any | null {
     externalUrl,
     imageUrl: images[0] || undefined,
     images: images.length > 0 ? images : undefined,
+    coverAssetId: assetIds[0] || clampString(raw.coverAssetId, 128) || undefined,
+    assetIds: assetIds.length > 0 ? assetIds : undefined,
     ocrData,
     tags,
     isProtected: Boolean(raw.isProtected),
@@ -811,7 +963,7 @@ function sanitizeBookMetadata(raw: any): any | undefined {
     authorBio: clampString(raw.authorBio, 4000),
     isbn: clampString(raw.isbn, 64) || undefined,
     publisher: clampString(raw.publisher, 160) || undefined,
-    publicationYear: clampString(raw.publicationYear, 32, '2025'),
+    publicationYear: clampString(raw.publicationYear, 32, '2026'),
     description: clampString(raw.description, 4000),
     coverAccent: clampString(raw.coverAccent, 64, '#C83E0B'),
     purchaseUrl: sanitizeExternalUrl(raw.purchaseUrl),
@@ -823,8 +975,16 @@ function readSingleStoreFile(filePath: string): PersistedArchiveStore | null {
     if (fs.existsSync(filePath)) {
       const raw = fs.readFileSync(filePath, 'utf-8');
       const parsed = JSON.parse(raw);
+      const validDeletedAssetIds = Array.isArray(parsed.deletedAssetIds)
+        ? parsed.deletedAssetIds
+            .map((id: unknown) => clampString(id, 140))
+            .filter(Boolean)
+        : [];
+      const deletedAssetSet = new Set<string>(validDeletedAssetIds);
       const validSources = Array.isArray(parsed.sources)
-        ? parsed.sources.map(sanitizeSourceRecord).filter(Boolean)
+        ? parsed.sources
+            .map((s: any) => sanitizeSourceRecord(s, deletedAssetSet))
+            .filter(Boolean)
         : [];
       const validDeletedIds = Array.isArray(parsed.deletedIds)
         ? parsed.deletedIds
@@ -834,7 +994,9 @@ function readSingleStoreFile(filePath: string): PersistedArchiveStore | null {
       return {
         sources: validSources,
         deletedIds: validDeletedIds,
-        bookMetadata: sanitizeBookMetadata(parsed.bookMetadata) || parsed.bookMetadata || undefined,
+        deletedAssetIds: validDeletedAssetIds,
+        bookMetadata:
+          sanitizeBookMetadata(parsed.bookMetadata) || parsed.bookMetadata || undefined,
         updatedAt: typeof parsed.updatedAt === 'number' ? parsed.updatedAt : Date.now(),
       };
     }
@@ -849,7 +1011,15 @@ function readArchiveStore(): PersistedArchiveStore {
     return cachedArchiveStore;
   }
 
-  const primary = readSingleStoreFile(ARCHIVE_STORE_PATH);
+  if (WRITABLE_ARCHIVE_STORE_PATH !== BUNDLED_ARCHIVE_STORE_PATH) {
+    const runtimeCopy = readSingleStoreFile(WRITABLE_ARCHIVE_STORE_PATH);
+    if (runtimeCopy) {
+      cachedArchiveStore = runtimeCopy;
+      return cachedArchiveStore;
+    }
+  }
+
+  const primary = readSingleStoreFile(BUNDLED_ARCHIVE_STORE_PATH);
   if (primary) {
     cachedArchiveStore = primary;
     return cachedArchiveStore;
@@ -858,6 +1028,7 @@ function readArchiveStore(): PersistedArchiveStore {
   cachedArchiveStore = {
     sources: [],
     deletedIds: [],
+    deletedAssetIds: [],
     updatedAt: 0,
   };
   return cachedArchiveStore;
@@ -879,10 +1050,187 @@ function writeArchiveStore(store: PersistedArchiveStore): void {
   const serialized = JSON.stringify(store, null, 2);
 
   try {
-    writeAtomicJsonFile(ARCHIVE_STORE_PATH, serialized);
+    writeAtomicJsonFile(WRITABLE_ARCHIVE_STORE_PATH, serialized);
   } catch (err) {
-    console.error('Failed to write root archive-store.json:', err);
+    console.error('Failed to write archive-store.json:', err);
   }
+}
+
+/**
+ * Hydrates cachedArchiveStore from Cloud Firestore with a 20s TTL so public visitors,
+ * social crawlers, and container restarts always reflect permanent cloud edits at $0 cost.
+ */
+async function hydrateArchiveFromFirestoreIfNeeded(force = false): Promise<void> {
+  const now = Date.now();
+  if (!force && now - lastFirestoreHydrationMs < FIRESTORE_CACHE_TTL_MS) {
+    return;
+  }
+  if (inflightHydration) {
+    return inflightHydration;
+  }
+
+  inflightHydration = (async () => {
+    try {
+      const db = getCloudFirestoreServer();
+      if (!db) return;
+
+      const [tombSnap, cfgSnap, srcSnap] = await withTimeout(
+        Promise.all([
+          fsGetDocs(
+            fsQuery(fsCollection(db, 'archive_tombstones'), fsWhere('isPublished', '==', true))
+          ),
+          fsGetDoc(fsDoc(db, 'archive_config', 'book_metadata')),
+          fsGetDocs(
+            fsQuery(fsCollection(db, 'archive_sources'), fsWhere('isPublished', '==', true))
+          ),
+        ]),
+        4000,
+        'Firestore server hydration'
+      );
+
+      lastFirestoreHydrationMs = Date.now();
+
+      // If Firestore hasn't been bootstrapped yet, keep local seed/store intact
+      if (srcSnap.empty && tombSnap.empty && !cfgSnap.exists()) {
+        return;
+      }
+
+      const currentStore = readArchiveStore();
+      const existingById = new Map<string, any>();
+      for (const s of currentStore.sources) {
+        if (s && s.id) existingById.set(s.id, s);
+      }
+
+      const cloudDeletedSourceIds = new Set<string>(currentStore.deletedIds || []);
+      const cloudDeletedAssetIds = new Set<string>(currentStore.deletedAssetIds || []);
+
+      tombSnap.forEach((docSnap) => {
+        const d = docSnap.data();
+        const tid = clampString(d.targetId || docSnap.id, 140);
+        if (!tid) return;
+        if (d.kind === 'source') {
+          cloudDeletedSourceIds.add(tid);
+        } else if (d.kind === 'asset') {
+          cloudDeletedAssetIds.add(tid);
+          unlinkPurgedAssetFromDisk(tid);
+        }
+      });
+
+      const hydratedSources: any[] = [];
+
+      srcSnap.forEach((docSnap) => {
+        const d = docSnap.data();
+        const id = clampString(d.id || docSnap.id, 140);
+        if (!id || cloudDeletedSourceIds.has(id)) return;
+
+        // If a cloud entry exists, remove it from any stale local deletedIds
+        const prevLocal = existingById.get(id);
+        const createdAtMs =
+          d.createdAt && typeof d.createdAt.toMillis === 'function'
+            ? d.createdAt.toMillis()
+            : prevLocal?.createdAt || Date.now();
+        const updatedAtMs =
+          d.updatedAt && typeof d.updatedAt.toMillis === 'function'
+            ? d.updatedAt.toMillis()
+            : Date.now();
+
+        // Preserve local raw content for protected chapters when public Firestore doc holds only summary
+        const summary = clampString(d.summary, 4000);
+        const cloudContent = clampString(d.content, 250000);
+        const mergedContent =
+          Boolean(d.isProtected) &&
+          prevLocal?.content &&
+          prevLocal.content.length > cloudContent.length
+            ? prevLocal.content
+            : cloudContent || summary || clampString(d.title, 320);
+
+        const sanitized = sanitizeSourceRecord(
+          {
+            id,
+            title: d.title,
+            type: d.type,
+            section: d.section,
+            author: d.author,
+            year: d.year,
+            reference: d.reference,
+            summary,
+            content: mergedContent,
+            externalUrl: d.externalUrl,
+            imageUrl: d.imageUrl,
+            images: d.images,
+            coverAssetId: d.coverAssetId,
+            assetIds: d.assetIds,
+            ocrData:
+              d.ocrDetectedPage || d.ocrDocumentType || prevLocal?.ocrData
+                ? {
+                    rawTranscription:
+                      prevLocal?.ocrData?.rawTranscription || mergedContent,
+                    detectedPage: d.ocrDetectedPage || prevLocal?.ocrData?.detectedPage,
+                    documentType: d.ocrDocumentType || prevLocal?.ocrData?.documentType,
+                    confidence: 0.95,
+                  }
+                : undefined,
+            tags: d.tags,
+            isProtected: d.isProtected,
+            createdAt: createdAtMs,
+            updatedAt: updatedAtMs,
+          },
+          cloudDeletedAssetIds
+        );
+
+        if (sanitized) {
+          hydratedSources.push(sanitized);
+        }
+      });
+
+      // Preserve any newly added entries in bundled archive-store.json that have not been
+      // deleted via tombstones and have not yet been flushed to Firestore by the author
+      const hydratedIdSet = new Set(hydratedSources.map((s) => s.id));
+      const bundledStore = readSingleStoreFile(BUNDLED_ARCHIVE_STORE_PATH);
+      if (bundledStore && Array.isArray(bundledStore.sources)) {
+        for (const bSrc of bundledStore.sources) {
+          if (
+            bSrc &&
+            bSrc.id &&
+            !hydratedIdSet.has(bSrc.id) &&
+            !cloudDeletedSourceIds.has(bSrc.id)
+          ) {
+            hydratedIdSet.add(bSrc.id);
+            hydratedSources.push(bSrc);
+          }
+        }
+      }
+
+      hydratedSources.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+      let nextBookMetadata = currentStore.bookMetadata;
+      if (cfgSnap.exists() && cfgSnap.data()?.isPublished) {
+        const cfgMeta = sanitizeBookMetadata(cfgSnap.data());
+        if (cfgMeta) nextBookMetadata = cfgMeta;
+      }
+
+      if (hydratedSources.length > 0 || cloudDeletedSourceIds.size > 0) {
+        const nextStore: PersistedArchiveStore = {
+          sources: hydratedSources,
+          deletedIds: Array.from(cloudDeletedSourceIds),
+          deletedAssetIds: Array.from(cloudDeletedAssetIds),
+          bookMetadata: nextBookMetadata,
+          updatedAt: Date.now(),
+        };
+        cachedArchiveStore = nextStore;
+        try {
+          writeAtomicJsonFile(WRITABLE_ARCHIVE_STORE_PATH, JSON.stringify(nextStore, null, 2));
+        } catch {}
+        cleanupUnreferencedCardAssets(hydratedSources);
+      }
+    } catch (err) {
+      console.warn('Firestore server hydration notice:', (err as Error)?.message || err);
+    } finally {
+      inflightHydration = null;
+    }
+  })();
+
+  return inflightHydration;
 }
 
 function computeArchiveStats(sources: any[]) {
@@ -903,9 +1251,57 @@ function computeArchiveStats(sources: any[]) {
   };
 }
 
+// Public GET /api/assets/:assetId — Immutable content-addressed image endpoint
+// Serves from fast local disk cache first; hydrates from Firestore archive_assets on cache miss.
+app.get('/api/assets/:assetId', async (req, res) => {
+  const assetId = clampString(req.params.assetId, 128);
+  if (!assetId || !/^[a-zA-Z0-9_-]{1,128}$/.test(assetId)) {
+    return res.status(400).json({ error: 'Invalid asset ID.' });
+  }
+
+  const store = readArchiveStore();
+  if (store.deletedAssetIds?.includes(assetId)) {
+    return res.status(404).json({ error: 'Asset has been removed.' });
+  }
+
+  // 1. Fast disk cache hit (0 Firestore reads)
+  const cached = readCachedAssetBinary(assetId);
+  if (cached) {
+    res.setHeader('Content-Type', cached.mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return res.send(cached.buf);
+  }
+
+  // 2. Cold cache miss: fetch once from Firestore archive_assets and persist to disk cache
+  try {
+    const db = getCloudFirestoreServer();
+    if (!db) {
+      return res.status(404).json({ error: 'Asset not found.' });
+    }
+    const snap = await fsGetDoc(fsDoc(db, 'archive_assets', assetId));
+    if (!snap.exists() || !snap.data()?.isPublished) {
+      return res.status(404).json({ error: 'Asset not found.' });
+    }
+    const d = snap.data();
+    const mimeType = clampString(d.mimeType, 32, 'image/jpeg');
+    const base64 = typeof d.dataBase64 === 'string' ? d.dataBase64 : '';
+    if (!base64) {
+      return res.status(404).json({ error: 'Empty asset payload.' });
+    }
+    const buf = Buffer.from(base64, 'base64');
+    writeCachedAssetBinary(assetId, mimeType, buf);
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+    return res.send(buf);
+  } catch {
+    return res.status(404).json({ error: 'Asset unavailable.' });
+  }
+});
+
 // Public GET /api/archive and /archive-store.json:
-// Everyone can view the canonical archive and all authored work reference pictures & citations
-app.get(['/api/archive', '/archive-store.json'], (_req, res) => {
+// Hydrates from Cloud Firestore if TTL expired so public readers always see the latest published state
+app.get(['/api/archive', '/archive-store.json'], async (_req, res) => {
+  await hydrateArchiveFromFirestoreIfNeeded(false);
   res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
   res.setHeader('Pragma', 'no-cache');
   res.setHeader('Expires', '0');
@@ -920,20 +1316,39 @@ app.get(['/api/archive', '/archive-store.json'], (_req, res) => {
 function cleanupUnreferencedCardAssets(sources: any[]): void {
   try {
     if (!fs.existsSync(CARDS_ASSETS_DIR)) return;
-    const referencedFiles = new Set<string>();
+    const referencedLegacyFiles = new Set<string>();
+    const referencedAssetIds = new Set<string>();
+
     for (const s of sources) {
       if (!s) continue;
       const imgs = getNormalizedSourceImages(s);
       for (const img of imgs) {
-        if (typeof img === 'string' && img.startsWith('/assets/cards/')) {
+        if (typeof img !== 'string') continue;
+        if (img.startsWith('/assets/cards/')) {
           const base = path.basename(img);
-          if (base) referencedFiles.add(base);
+          if (base) referencedLegacyFiles.add(base);
+        }
+        const aid = extractServerAssetId(img);
+        if (aid) referencedAssetIds.add(aid);
+      }
+      if (typeof s.coverAssetId === 'string') referencedAssetIds.add(s.coverAssetId);
+      if (Array.isArray(s.assetIds)) {
+        for (const a of s.assetIds) {
+          if (typeof a === 'string') referencedAssetIds.add(a);
         }
       }
     }
+
     const existingFiles = fs.readdirSync(CARDS_ASSETS_DIR);
     for (const file of existingFiles) {
-      if (!referencedFiles.has(file)) {
+      if (file.endsWith('.bin') || file.endsWith('.mime')) {
+        const assetId = file.replace(/\.(bin|mime)$/i, '');
+        if (!referencedAssetIds.has(assetId)) {
+          try {
+            fs.unlinkSync(path.join(CARDS_ASSETS_DIR, file));
+          } catch {}
+        }
+      } else if (!referencedLegacyFiles.has(file)) {
         try {
           fs.unlinkSync(path.join(CARDS_ASSETS_DIR, file));
         } catch {}
@@ -942,7 +1357,7 @@ function cleanupUnreferencedCardAssets(sources: any[]): void {
   } catch {}
 }
 
-// Studio Admin POST /api/archive/sync: Syncs author's local Studio sources, citations & pictures to server store
+// Studio Admin POST /api/archive/sync: Syncs Studio sources, citations & pictures to server mirror
 app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
   if (!isStudioAdminRequest(req)) {
     return res.status(401).json({
@@ -957,10 +1372,23 @@ app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
         .map((id: unknown) => clampString(id, 140))
         .filter(Boolean)
     : [];
+  const incomingDeletedAssetIds = Array.isArray(req.body?.deletedAssetIds)
+    ? req.body.deletedAssetIds
+        .map((id: unknown) => clampString(id, 140))
+        .filter(Boolean)
+    : [];
   const incomingMetadata = sanitizeBookMetadata(req.body?.bookMetadata);
 
   const store = readArchiveStore();
   const deletedSet = new Set<string>([...store.deletedIds, ...incomingDeletedIds]);
+  const deletedAssetSet = new Set<string>([
+    ...(store.deletedAssetIds || []),
+    ...incomingDeletedAssetIds,
+  ]);
+
+  for (const aid of incomingDeletedAssetIds) {
+    unlinkPurgedAssetFromDisk(aid);
+  }
 
   const existingById = new Map<string, any>();
   for (const s of store.sources) {
@@ -973,7 +1401,7 @@ app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
   const seenIds = new Set<string>();
 
   for (const rawInc of incomingSources.slice(0, 500)) {
-    const inc = sanitizeSourceRecord(rawInc);
+    const inc = sanitizeSourceRecord(rawInc, deletedAssetSet);
     if (!inc || deletedSet.has(inc.id) || seenIds.has(inc.id)) continue;
     seenIds.add(inc.id);
 
@@ -981,10 +1409,8 @@ app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
     if (!existing) {
       nextSources.push(inc);
     } else {
-      const incImages = getNormalizedSourceImages(inc);
-      const exImages = getNormalizedSourceImages(existing);
-      // Only fall back to existing images if preserveExistingImages is explicitly set for chunked uploads;
-      // otherwise respect image removals (incImages = []) when the author deletes a picture from a card.
+      const incImages = getNormalizedSourceImages(inc, deletedAssetSet);
+      const exImages = getNormalizedSourceImages(existing, deletedAssetSet);
       const finalImages =
         preserveExistingImages && incImages.length === 0 ? exImages : incImages;
 
@@ -1001,10 +1427,12 @@ app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
 
   store.sources = nextSources;
   store.deletedIds = Array.from(deletedSet);
+  store.deletedAssetIds = Array.from(deletedAssetSet);
   if (incomingMetadata) {
     store.bookMetadata = incomingMetadata;
   }
 
+  lastFirestoreHydrationMs = Date.now();
   writeArchiveStore(store);
   cleanupUnreferencedCardAssets(store.sources);
   const stats = computeArchiveStats(store.sources);
@@ -1014,7 +1442,7 @@ app.post('/api/archive/sync', adminRateLimiter, (req, res) => {
   });
 });
 
-// Studio Admin POST /api/archive/source: Create or update a single card
+// Studio Admin POST /api/archive/source: Create or update a single card & purge superseded assets
 app.post('/api/archive/source', adminRateLimiter, (req, res) => {
   if (!isStudioAdminRequest(req)) {
     return res.status(401).json({
@@ -1022,13 +1450,33 @@ app.post('/api/archive/source', adminRateLimiter, (req, res) => {
     });
   }
 
-  const sanitized = sanitizeSourceRecord(req.body?.source);
+  const purgedAssetIds: string[] = Array.isArray(req.body?.purgedAssetIds)
+    ? req.body.purgedAssetIds
+        .map((id: unknown) => clampString(id, 140))
+        .filter(Boolean)
+    : [];
+
+  const store = readArchiveStore();
+  const deletedAssetSet = new Set<string>([
+    ...(store.deletedAssetIds || []),
+    ...purgedAssetIds,
+  ]);
+
+  for (const aid of purgedAssetIds) {
+    unlinkPurgedAssetFromDisk(aid);
+  }
+
+  const sanitized = sanitizeSourceRecord(req.body?.source, deletedAssetSet);
   if (!sanitized) {
     return res.status(400).json({ error: 'Valid source object is required.' });
   }
 
-  const store = readArchiveStore();
   store.deletedIds = store.deletedIds.filter((id) => id !== sanitized.id);
+  // Ensure any active asset IDs on this card are not marked deleted
+  for (const activeAid of sanitized.assetIds || []) {
+    deletedAssetSet.delete(activeAid);
+  }
+  store.deletedAssetIds = Array.from(deletedAssetSet);
 
   const enrichedSource = {
     ...sanitized,
@@ -1037,7 +1485,10 @@ app.post('/api/archive/source', adminRateLimiter, (req, res) => {
       Array.isArray(sanitized.images) && sanitized.images.length > 0
         ? sanitized.images
         : undefined,
-    updatedAt: Date.now(),
+    updatedAt:
+      typeof req.body?.source?.updatedAt === 'number'
+        ? req.body.source.updatedAt
+        : Date.now(),
   };
 
   const idx = store.sources.findIndex((s) => s.id === sanitized.id);
@@ -1047,13 +1498,14 @@ app.post('/api/archive/source', adminRateLimiter, (req, res) => {
     store.sources.unshift(enrichedSource);
   }
 
+  lastFirestoreHydrationMs = Date.now();
   writeArchiveStore(store);
   cleanupUnreferencedCardAssets(store.sources);
   const stats = computeArchiveStats(store.sources);
   return res.json({ status: 'ok', source: enrichedSource, store, stats });
 });
 
-// Studio Admin DELETE /api/archive/source/:id: Delete a card from the archive
+// Studio Admin DELETE /api/archive/source/:id: Delete a card & purge its assets from server cache
 app.delete('/api/archive/source/:id', adminRateLimiter, (req, res) => {
   if (!isStudioAdminRequest(req)) {
     return res.status(401).json({
@@ -1067,11 +1519,30 @@ app.delete('/api/archive/source/:id', adminRateLimiter, (req, res) => {
   }
 
   const store = readArchiveStore();
+  const targetSource = store.sources.find((s) => s.id === targetId);
+  const deletedAssetSet = new Set<string>(store.deletedAssetIds || []);
+
+  if (targetSource) {
+    for (const aid of targetSource.assetIds || []) {
+      deletedAssetSet.add(aid);
+      unlinkPurgedAssetFromDisk(aid);
+    }
+    for (const img of getNormalizedSourceImages(targetSource)) {
+      const aid = extractServerAssetId(img);
+      if (aid) {
+        deletedAssetSet.add(aid);
+        unlinkPurgedAssetFromDisk(aid);
+      }
+    }
+  }
+
   store.sources = store.sources.filter((s) => s.id !== targetId);
   if (!store.deletedIds.includes(targetId)) {
     store.deletedIds.push(targetId);
   }
+  store.deletedAssetIds = Array.from(deletedAssetSet);
 
+  lastFirestoreHydrationMs = Date.now();
   writeArchiveStore(store);
   cleanupUnreferencedCardAssets(store.sources);
   const stats = computeArchiveStats(store.sources);
@@ -1093,6 +1564,7 @@ app.post('/api/archive/metadata', adminRateLimiter, (req, res) => {
 
   const store = readArchiveStore();
   store.bookMetadata = metadata;
+  lastFirestoreHydrationMs = Date.now();
   writeArchiveStore(store);
   return res.json({ status: 'ok', bookMetadata: store.bookMetadata });
 });
@@ -1240,6 +1712,7 @@ app.get('/robots.txt', (req, res) => {
     '',
     'User-agent: *',
     'Allow: /',
+    'Allow: /api/assets/',
     'Disallow: /api/',
     '',
     'User-agent: OAI-SearchBot',
@@ -1285,7 +1758,8 @@ app.get('/robots.txt', (req, res) => {
 });
 
 // 8b. GET /sitemap.xml — Dynamic XML Sitemap for Google, Bing, and AI Search Crawlers
-app.get('/sitemap.xml', (req, res) => {
+app.get('/sitemap.xml', async (req, res) => {
+  await hydrateArchiveFromFirestoreIfNeeded(false);
   const store = readArchiveStore();
   const origin = getRequestBaseOrigin(req) || 'https://ais-pre-k45qz7ft6qnyzidgkwmbo3-712571561551.europe-west1.run.app';
   const lastModDate = new Date(store.updatedAt || Date.now()).toISOString();
@@ -1312,7 +1786,8 @@ app.get('/sitemap.xml', (req, res) => {
 });
 
 // 8c. GET /llms.txt & /llm.txt — Standardized LLM Discovery Index (ChatGPT, Claude, Gemini, Perplexity)
-app.get(['/llms.txt', '/llm.txt'], (req, res) => {
+app.get(['/llms.txt', '/llm.txt'], async (req, res) => {
+  await hydrateArchiveFromFirestoreIfNeeded(false);
   const store = readArchiveStore();
   const origin = getRequestBaseOrigin(req) || 'https://ais-pre-k45qz7ft6qnyzidgkwmbo3-712571561551.europe-west1.run.app';
   const authoredSources = store.sources.filter((s) => getNormalizedSourceSection(s) === 'authored');
@@ -1356,7 +1831,8 @@ app.get(['/llms.txt', '/llm.txt'], (req, res) => {
 });
 
 // 8d. GET /llms-full.txt — Extended Public Summaries, Quotations & Research Context for AI Grounding
-app.get('/llms-full.txt', (req, res) => {
+app.get('/llms-full.txt', async (req, res) => {
+  await hydrateArchiveFromFirestoreIfNeeded(false);
   const store = readArchiveStore();
   const origin = getRequestBaseOrigin(req) || 'https://ais-pre-k45qz7ft6qnyzidgkwmbo3-712571561551.europe-west1.run.app';
   const authoredSources = store.sources.filter((s) => getNormalizedSourceSection(s) === 'authored');
@@ -1633,19 +2109,29 @@ async function startServer() {
   const distPath = path.resolve(__dirname, 'dist');
   const distIndexHtml = path.resolve(distPath, 'index.html');
 
-  if (isProd && fs.existsSync(distIndexHtml)) {
-    app.use(express.static(distPath, { index: false }));
-    app.get('*', (req, res) => {
-      try {
-        const rawHtml = fs.readFileSync(distIndexHtml, 'utf-8');
-        const enrichedHtml = enrichHtmlForSearchAndLLMs(rawHtml, req);
-        res.setHeader('Content-Type', 'text/html; charset=utf-8');
-        return res.send(enrichedHtml);
-      } catch {}
-      return res.sendFile(distIndexHtml);
+  if (isProd) {
+    if (fs.existsSync(distPath)) {
+      app.use(express.static(distPath, { index: false }));
+    }
+    app.get('*', async (req, res) => {
+      if (fs.existsSync(distIndexHtml)) {
+        try {
+          await hydrateArchiveFromFirestoreIfNeeded(false);
+          const rawHtml = fs.readFileSync(distIndexHtml, 'utf-8');
+          const enrichedHtml = enrichHtmlForSearchAndLLMs(rawHtml, req);
+          res.setHeader('Content-Type', 'text/html; charset=utf-8');
+          return res.send(enrichedHtml);
+        } catch {}
+        return res.sendFile(distIndexHtml);
+      }
+      return res
+        .status(503)
+        .setHeader('Content-Type', 'text/plain; charset=utf-8')
+        .send('Application bundle is initializing. Please refresh shortly.');
     });
     server.listen(port, '0.0.0.0', () => {
       console.log(`FolioLM production server listening on http://0.0.0.0:${port}`);
+      hydrateArchiveFromFirestoreIfNeeded(true).catch(() => {});
     });
     return;
   }
@@ -1653,6 +2139,7 @@ async function startServer() {
   // Dev mode: bind port immediately so health checks pass while Vite initializes
   server.listen(port, '0.0.0.0', () => {
     console.log(`FolioLM dev server listening on http://0.0.0.0:${port}`);
+    hydrateArchiveFromFirestoreIfNeeded(true).catch(() => {});
   });
 
   process.env.DISABLE_HMR = 'true';
