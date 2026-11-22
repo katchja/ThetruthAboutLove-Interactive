@@ -11,6 +11,8 @@ import { ArchivePageView } from './components/ArchivePageView';
 import { ConversationalPopupWindow } from './components/ConversationalPopupWindow';
 import { BookSettingsModal } from './components/BookSettingsModal';
 import { SafetyDisclosureModal } from './components/SafetyDisclosureModal';
+import { PitchPageView } from './components/PitchPageView';
+import { WhatsAppCompanionModal } from './components/WhatsAppCompanionModal';
 import {
   Source,
   VectorChunk,
@@ -72,14 +74,13 @@ function synthesizeGroundedResponse(
   isStudioAdmin = false
 ): string {
   if (searchResults.length === 0) {
-    return `Love is not an emotion—it is a fundamental life force and the unifying field of consciousness.\n\nNo direct passage matched "${query}" in the currently selected archive filter. Try selecting all sources in the archive to search across the full manuscript chapters and Substack essays.`;
+    return `Love is not an emotion—it is a fundamental life force and the unifying field of consciousness. No direct passage matched "${query}" in the selected filter; try selecting all archive sources to search the full manuscript.`;
   }
 
   const top = searchResults[0];
   const second = searchResults[1];
-  const third = searchResults[2];
 
-  const getSafeSynthesisSnippet = (sr: SearchResult, maxLen = 280) => {
+  const getSafeSynthesisSnippet = (sr: SearchResult, maxLen = 190) => {
     const parent = allSources.find((s) => s.id === sr.chunk.sourceId);
     const rawText =
       parent?.isProtected && !isStudioAdmin
@@ -101,18 +102,11 @@ function synthesizeGroundedResponse(
       : joined;
   };
 
-  let response = `Drawing directly from **${top.chunk.sourceTitle}** [Source 1]:\n\n${getSafeSynthesisSnippet(top, 300)}\n\n`;
-
+  let response = `In **${top.chunk.sourceTitle}** [Source 1], ${getSafeSynthesisSnippet(top, 195)}`;
   if (second) {
-    response += `This connects directly to **${second.chunk.sourceTitle}** [Source 2]:\n\n${getSafeSynthesisSnippet(second, 220)}\n\n`;
-  }
-
-  response += `- **Core Thesis:** Love is a generative, syntropic life force [Source 1]. Love never wounds; only power distortions, ego projections, and programmatic substitutes create suffering.\n`;
-  if (second) {
-    response += `- **Expanded Perspective:** ${getSafeSynthesisSnippet(second, 140)} [Source 2]\n`;
-  }
-  if (third) {
-    response += `- **Further Reading:** Explore **${third.chunk.sourceTitle}** [Source 3] for deeper context.`;
+    response += ` This connects to **${second.chunk.sourceTitle}** [Source 2], showing how love acts as a syntropic life force rather than ego projection.`;
+  } else {
+    response += ` Love never wounds—only power distortions and ego projections create suffering [Source 1].`;
   }
 
   return response;
@@ -194,6 +188,33 @@ export default function App() {
   const [defaultAddSection, setDefaultAddSection] =
     useState<ArchiveSection>('authored');
   const [isBookSettingsOpen, setIsBookSettingsOpen] = useState(false);
+  const [isWhatsAppModalOpen, setIsWhatsAppModalOpen] = useState(false);
+  const [completedDimensions, setCompletedDimensions] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem('voicebook_completed_dimensions_v1');
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const handleCompleteDimension = useCallback((dimensionId: string) => {
+    setCompletedDimensions((prev) => {
+      if (prev.includes(dimensionId)) return prev;
+      const next = [...prev, dimensionId];
+      try {
+        localStorage.setItem('voicebook_completed_dimensions_v1', JSON.stringify(next));
+      } catch {
+        // Ignore storage errors
+      }
+      fetch('/api/traction/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventType: 'dimensionsCompleted' }),
+      }).catch(() => {});
+      return next;
+    });
+  }, []);
 
   // Strict Google AI Studio Author & Admin detection:
   // Active only in Google AI Studio Build environment (ais-dev-* / localhost), hidden on public shared URLs (ais-pre-*)
@@ -1390,6 +1411,7 @@ export default function App() {
         }
         syncStatus={syncStatus}
         syncedStats={syncedStats}
+        onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
       />
 
       {/* Studio-Only Author Cloud Auto-Save Bar (Strictly hidden on public shared ais-pre-* URLs) */}
@@ -1494,6 +1516,23 @@ export default function App() {
         />
       )}
 
+      {/* VIEW: VoiceBook Investor Pitch & Author SaaS Studio Page */}
+      {currentView === 'pitch' && (
+        <PitchPageView
+          sources={sources}
+          onReturnToManuscript={() => {
+            setCurrentView('landing');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenArchive={() => {
+            setCurrentView('archive');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+          completedDimensionsCount={completedDimensions.length}
+        />
+      )}
+
       {/* VIEW: Book Landing Page Mode (Default Homepage with Conversational Q&A) */}
       {currentView === 'landing' && (
         <LandingPageView
@@ -1509,8 +1548,27 @@ export default function App() {
           chatModel={chatModel}
           isOfflineMode={isOfflineMode}
           onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
+          onOpenWhatsAppModal={() => setIsWhatsAppModalOpen(true)}
+          onOpenPitchPage={() => {
+            setCurrentView('pitch');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          completedDimensions={completedDimensions}
+          onCompleteDimension={handleCompleteDimension}
         />
       )}
+
+      {/* WHATSAPP VOICEBOOK COMPANION MODAL */}
+      <WhatsAppCompanionModal
+        isOpen={isWhatsAppModalOpen}
+        onClose={() => setIsWhatsAppModalOpen(false)}
+        sources={sources}
+        onSelectSource={(s) => {
+          setIsWhatsAppModalOpen(false);
+          setActiveSourceDetail(s);
+        }}
+        isRunaPage={currentView === 'pitch'}
+      />
 
       {/* FLOATING POPUP CONVERSATIONAL WINDOW (Available on every page) */}
       <ConversationalPopupWindow
@@ -1525,6 +1583,7 @@ export default function App() {
         sources={sources}
         chatModel={chatModel}
         onOpenSafetyModal={() => setIsSafetyModalOpen(true)}
+        isRunaPage={currentView === 'pitch'}
       />
 
       {/* CONVERSATIONAL SAFETY, FAIR DISCLOSURE & GUARDRAILS MODAL */}

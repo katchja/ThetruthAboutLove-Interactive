@@ -11,11 +11,15 @@ import {
   Check,
   RotateCcw,
   ShieldCheck,
-  Heart
+  Heart,
+  MessageCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import { BookMetadata, Source, ChatMessage, Citation, ChatModelTier, getSourceSection } from '../types';
 import { LabsFlowerShape, LabsCloudShape, Labs3DBlobShape } from './LabsFloatingShapes';
 import { FAIR_DISCLOSURE_SHORT_TEXT } from '../utils/chatGuardrails';
+import { VoiceNotePlayerBubble, VoiceNoteRecorderButton } from './VoiceNoteControls';
+import { SubscriberWaitlistSection } from './SubscriberWaitlistSection';
 
 const BOOK_COVER_SRC = '/assets/aistudio/Book_cover__5__ce375b5d.png';
 
@@ -76,6 +80,10 @@ interface LandingPageViewProps {
   chatModel?: ChatModelTier;
   isOfflineMode: boolean;
   onOpenSafetyModal?: () => void;
+  onOpenWhatsAppModal?: () => void;
+  onOpenPitchPage?: () => void;
+  completedDimensions?: string[];
+  onCompleteDimension?: (dimensionTag: string) => void;
 }
 
 export const LandingPageView: React.FC<LandingPageViewProps> = ({
@@ -88,6 +96,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
   onClearChat,
   chatModel = 'gemini-3.1-flash-lite',
   onOpenSafetyModal,
+  onOpenWhatsAppModal,
+  onOpenPitchPage,
+  completedDimensions = [],
+  onCompleteDimension,
 }) => {
   const [quickQuery, setQuickQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -327,11 +339,10 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           <div className="bg-[#F1F3F4] px-8 sm:px-14 py-10 sm:py-14">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-8">
               <div className="space-y-4 sm:space-y-5 max-w-2xl">
-                <div className="flex items-center gap-3 text-xs font-mono font-medium text-[#202124] pb-1">
+                <div className="flex flex-wrap items-center gap-3 text-xs font-mono font-medium text-[#202124] pb-1">
                   <div className="w-7 h-7 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
                     <Heart className="w-3.5 h-3.5 text-white fill-white" />
                   </div>
-                  <span className="tracking-wide uppercase">Conversational Manuscript</span>
                   <span className="text-[#80868B]">·</span>
                   <span className="text-[#5F6368] font-mono">
                     {sources.length} Sources
@@ -341,14 +352,24 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   Chat with The Truth About Love
                 </h2>
                 <p className="text-sm sm:text-base text-[#5F6368] leading-relaxed pt-1 font-sans">
-                  Chat with the manuscript. Every response is grounded in the author's manuscript, author notes, research literature and research.
+                  Write a question or record a spoken voice note. Every response is a concise, conversational chat and playable voice note grounded in Catalina&apos;s human-written manuscript and archive.
                 </p>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 self-start lg:self-center text-xs font-mono text-[#5F6368]">
-                <span className="text-[#0B0B0C] font-medium">Gemini Flash-Lite</span>
+              <div className="flex flex-wrap items-center gap-2.5 self-start lg:self-center text-xs font-mono text-[#5F6368]">
+                {onOpenWhatsAppModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenWhatsAppModal}
+                    className="px-3.5 py-2 rounded-full bg-[#DCFCE7] hover:bg-[#BBF7D0] text-[#15803D] font-semibold transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                  >
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    <span>WhatsApp Runa</span>
+                  </button>
+                )}
+                <span className="text-[#0B0B0C] font-medium">Short Chat + Voice Note</span>
                 <span aria-hidden="true">·</span>
-                <span>Safeguarded version</span>
+                <span>Safeguarded</span>
               </div>
             </div>
           </div>
@@ -392,8 +413,20 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
 
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-5 mt-3 cursor-default">
                 <div className="flex items-center gap-2.5 text-xs text-[#5F6368] flex-wrap font-sans">
-                  <span className="hidden md:inline text-[#5F6368]">
-                    Press <kbd className="font-mono px-1.5 py-0.5 rounded bg-[#F1F3F4] text-[#202124] text-[11px]">Enter</kbd> to ask, <kbd className="font-mono px-1.5 py-0.5 rounded bg-[#F1F3F4] text-[#202124] text-[11px]">Shift+Enter</kbd> for new line
+                  <VoiceNoteRecorderButton
+                    disabled={isChatLoading}
+                    onTranscriptReady={async (transcript, autoSend) => {
+                      if (autoSend) {
+                        setQuickQuery('');
+                        scrollToComposerAndThread();
+                        await onSendMessage(transcript);
+                      } else {
+                        setQuickQuery(transcript);
+                      }
+                    }}
+                  />
+                  <span className="hidden xl:inline text-[#5F6368]">
+                    Press <kbd className="font-mono px-1.5 py-0.5 rounded bg-[#F1F3F4] text-[#202124] text-[11px]">Enter</kbd> to ask, or record a Voice Note
                   </span>
                 </div>
 
@@ -521,7 +554,16 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                             {message.content}
                           </p>
                         ) : (
-                          renderMessageContent(message.content, message.citations)
+                          <>
+                            {renderMessageContent(message.content, message.citations)}
+                            <div className="mt-4 pt-2">
+                              <VoiceNotePlayerBubble
+                                text={message.content}
+                                initialAudioDataUrl={message.audioDataUrl}
+                                label="Catalina’s Runa Note"
+                              />
+                            </div>
+                          </>
                         )}
 
                         {message.role === 'assistant' &&
@@ -674,17 +716,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                 </p>
               </div>
 
-              <div className="flex items-center gap-3 pt-2 text-xs font-mono text-[#5F6368]">
+              <div className="flex flex-wrap items-center gap-3 pt-2 text-xs font-mono text-[#5F6368]">
                 <div className="w-7 h-7 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
                   <Heart className="w-3.5 h-3.5 text-white fill-white" />
                 </div>
                 <span>By <strong className="text-[#0B0B0C] font-medium">Catalina Butnaru</strong></span>
                 <span>·</span>
-                <span>Self-published interactive manuscript</span>
+                <span>2026 Interactive Edition</span>
               </div>
 
               {/* CTAs */}
-              <div className="flex flex-wrap items-center gap-4 pt-3">
+              <div className="flex flex-wrap items-center gap-3.5 pt-3">
                 <a
                   href="#conversational-archive"
                   onClick={(e) => {
@@ -697,6 +739,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   <span>Ask Manuscript</span>
                   <ArrowRight className="w-4 h-4" />
                 </a>
+
+                {onOpenWhatsAppModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenWhatsAppModal}
+                    className="px-6 py-4 rounded-full bg-[#DCFCE7] hover:bg-[#BBF7D0] text-[#15803D] text-sm font-sans font-medium transition-colors flex items-center gap-2 cursor-pointer"
+                  >
+                    <MessageCircle className="w-4 h-4" />
+                    <span>WhatsApp Companion</span>
+                  </button>
+                )}
 
                 <button
                   onClick={onOpenArchive}
@@ -809,16 +862,32 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
           className="hidden md:block pointer-events-none absolute -right-24 lg:-right-16 top-2 w-[240px] lg:w-[290px] h-[240px] lg:h-[290px] opacity-75 labs-shape-float-rotate"
         />
 
-        <div className="relative z-10 text-center max-w-2xl mx-auto space-y-5 mb-16">
+        <div className="relative z-10 text-center max-w-2xl mx-auto space-y-5 mb-12">
           <span className="text-xs font-mono font-medium text-[#5F6368] uppercase tracking-widest block pb-1">
-            THE ARCHITECTURE OF LOVE
+            THE ARCHITECTURE OF LOVE · INTERACTIVE READING JOURNEY
           </span>
           <h2 className="text-2xl sm:text-3xl md:text-4xl font-display font-medium text-[#0B0B0C]">
             The Five Dimensions of Love
           </h2>
           <p className="text-xs sm:text-sm text-[#202124] leading-relaxed pt-1 font-sans">
-            Love expands what theoretical biologist Stuart Kauffman calls the adjacent possible. It is much more like syntropy than an emotion. Here&apos;s how love expands us across five dimensions of our existence.
+            Love expands what theoretical biologist Stuart Kauffman calls the adjacent possible. It is much more like syntropy than an emotion. Explore all five dimensions below to complete your interactive reading journey.
           </p>
+
+          {/* Interactive 5-Dimension Progress Bar */}
+          <div className="max-w-md mx-auto pt-2 space-y-2">
+            <div className="flex items-center justify-between text-xs font-mono text-[#0B0B0C]">
+              <span>Reading Journey Progress</span>
+              <span className="tabular-nums font-semibold text-[#C83E0B]">
+                {completedDimensions.length} / 5 Dimensions Explored
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-[#E8EAED] overflow-hidden">
+              <div
+                className="h-full bg-[#C83E0B] transition-all duration-500 rounded-full"
+                style={{ width: `${Math.min(100, (completedDimensions.length / 5) * 100)}%` }}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
@@ -863,12 +932,15 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             },
           ].map((card, i) => {
             const isFeatured = card.isFeatured;
+            const isCompleted = completedDimensions.includes(card.tag);
             return (
               <div
                 key={i}
                 className={`p-8 rounded-3xl transition-all flex flex-col justify-between gap-6 ${
                   isFeatured
                     ? 'bg-[#0B0B0C] text-[#FFFFFF] relative overflow-hidden transform md:-translate-y-1'
+                    : isCompleted
+                    ? 'bg-[#F8F9FA] text-[#0B0B0C] border border-[#C83E0B]/40'
                     : 'bg-[#F8F9FA] text-[#0B0B0C]'
                 }`}
               >
@@ -884,10 +956,17 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                       {isFeatured && <Sparkles className="w-3 h-3" />}
                       {card.tag}
                     </span>
-                    {isFeatured && (
+                    {isFeatured ? (
                       <span className="text-[10px] font-mono font-medium text-[#0B0B0C] uppercase tracking-wider bg-[#FFFFFF] px-2.5 py-1 rounded-full">
                         Interactive
                       </span>
+                    ) : (
+                      isCompleted && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-mono font-semibold text-[#15803D] bg-[#DCFCE7] px-2.5 py-0.5 rounded-full">
+                          <CheckCircle2 className="w-3 h-3" />
+                          <span>Explored</span>
+                        </span>
+                      )
                     )}
                   </div>
 
@@ -932,6 +1011,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      if (onCompleteDimension) onCompleteDimension(card.tag);
                       scrollToComposerAndThread();
                       onSendMessage(
                         `Tell me about ${card.title} (${card.subtitle}) and the insights from ${card.tag}.`
@@ -939,7 +1019,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
                     }}
                     className="self-start px-4 py-2.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs font-sans font-medium transition-all flex items-center gap-2 mt-2 group cursor-pointer"
                   >
-                    <span>Talk to the manuscript</span>
+                    <span>{isCompleted ? 'Revisit dimension' : 'Talk to the manuscript'}</span>
                     <ChevronRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                   </button>
                 )}
@@ -1119,6 +1199,41 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
       </section>
 
       {/* ========================================================================
+          SECTION 7: READER SUBSCRIBER & VOICEBOOK AUTHOR WAITLIST + PITCH BANNER
+          ======================================================================== */}
+      <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-24 space-y-10">
+        <SubscriberWaitlistSection
+          completedDimensionsCount={completedDimensions.length}
+          defaultRole="reader"
+          onOpenWhatsAppModal={onOpenWhatsAppModal}
+        />
+
+        {onOpenPitchPage && (
+          <div className="p-8 sm:p-10 rounded-3xl bg-[#0B0B0C] text-white flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="space-y-2 max-w-2xl">
+              <span className="text-xs font-mono uppercase tracking-wider text-[#C83E0B] font-semibold block">
+                RUNA · AUTHOR SAAS &amp; INVESTOR SHOWCASE
+              </span>
+              <h3 className="text-xl sm:text-2xl font-display font-medium text-white">
+                For Culture &amp; Depth. Runa makes your book conversational.
+              </h3>
+              <p className="text-xs sm:text-sm text-[#BDC1C6] leading-relaxed">
+                Explore the live Runa Author SaaS sandbox, Meta WhatsApp Cloud API webhook inspector, author IP sovereignty architecture, and investor traction dashboard.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={onOpenPitchPage}
+              className="px-6 py-3.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white text-xs sm:text-sm font-medium transition-colors inline-flex items-center gap-2 shrink-0 self-start md:self-center cursor-pointer"
+            >
+              <span>Open Runa Pitch &amp; Demo</span>
+              <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+      </section>
+
+      {/* ========================================================================
           EDITORIAL FOOTER & MACHINE-READABLE CITATION INDEX
           ======================================================================== */}
       <footer className="max-w-6xl mx-auto px-4 sm:px-6 pt-20">
@@ -1128,7 +1243,7 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             <span aria-hidden="true">·</span>
             <span>By Catalina Butnaru</span>
             <span aria-hidden="true">·</span>
-            <span>Interactive Conversational Manuscript &amp; Archive</span>
+            <span>Powered by Runa</span>
           </div>
 
           <nav aria-label="Archive and Citation Resources" className="flex flex-wrap items-center gap-4">
@@ -1139,6 +1254,15 @@ export const LandingPageView: React.FC<LandingPageViewProps> = ({
             >
               Interactive Archive ({sources.length})
             </button>
+            {onOpenPitchPage && (
+              <button
+                type="button"
+                onClick={onOpenPitchPage}
+                className="hover:text-[#0B0B0C] underline-offset-4 hover:underline transition-colors cursor-pointer whitespace-nowrap font-medium text-[#C83E0B]"
+              >
+                Runa Pitch
+              </button>
+            )}
             {onOpenSafetyModal && (
               <button
                 type="button"

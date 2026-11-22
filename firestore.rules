@@ -169,6 +169,47 @@ service cloud.firestore {
         && data.updatedAt is timestamp;
     }
 
+    function isValidArchiveSubscriber(data, subscriberId) {
+      return data.keys().hasAll([
+          'subscriberId', 'email', 'whatsappOptIn', 'role', 'completedDimensions', 'createdAt'
+        ])
+        && data.keys().hasOnly([
+          'subscriberId', 'email', 'name', 'whatsappOptIn', 'whatsappPhone',
+          'role', 'publicationUrl', 'completedDimensions', 'createdAt'
+        ])
+        && data.subscriberId is string && data.subscriberId.size() >= 1 && data.subscriberId.size() <= 128 && data.subscriberId == subscriberId
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 180
+        && data.email.matches('^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$')
+        && (!('name' in data) || (data.name is string && data.name.size() >= 1 && data.name.size() <= 120))
+        && data.whatsappOptIn is bool
+        && (!('whatsappPhone' in data) || (data.whatsappPhone is string && data.whatsappPhone.size() >= 5 && data.whatsappPhone.size() <= 32))
+        && data.role is string && data.role.size() >= 6 && data.role.size() <= 16
+        && data.role in ['reader', 'author', 'investor']
+        && (!('publicationUrl' in data) || (data.publicationUrl is string && data.publicationUrl.size() >= 1 && data.publicationUrl.size() <= 512))
+        && data.completedDimensions is int && data.completedDimensions >= 0 && data.completedDimensions <= 5
+        && data.createdAt is timestamp;
+    }
+
+    function isValidArchiveMetrics(data, metricId) {
+      return data.keys().hasAll([
+          'metricId', 'totalInquiries', 'voiceNotesGenerated', 'whatsappCompanionSessions',
+          'dimensionsCompleted', 'subscriberCount', 'humanVerifiedChecks', 'isPublished', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'metricId', 'totalInquiries', 'voiceNotesGenerated', 'whatsappCompanionSessions',
+          'dimensionsCompleted', 'subscriberCount', 'humanVerifiedChecks', 'isPublished', 'updatedAt'
+        ])
+        && data.metricId is string && data.metricId.size() >= 1 && data.metricId.size() <= 64 && data.metricId == metricId
+        && data.totalInquiries is int && data.totalInquiries >= 0 && data.totalInquiries <= 100000000
+        && data.voiceNotesGenerated is int && data.voiceNotesGenerated >= 0 && data.voiceNotesGenerated <= 100000000
+        && data.whatsappCompanionSessions is int && data.whatsappCompanionSessions >= 0 && data.whatsappCompanionSessions <= 100000000
+        && data.dimensionsCompleted is int && data.dimensionsCompleted >= 0 && data.dimensionsCompleted <= 100000000
+        && data.subscriberCount is int && data.subscriberCount >= 0 && data.subscriberCount <= 100000000
+        && data.humanVerifiedChecks is int && data.humanVerifiedChecks >= 0 && data.humanVerifiedChecks <= 100000000
+        && data.isPublished is bool
+        && data.updatedAt is timestamp;
+    }
+
     // =========================================================================
     // 1. Public Manuscript Metadata & Literature Entries
     // =========================================================================
@@ -342,5 +383,51 @@ service cloud.firestore {
 
       allow delete: if isVerifiedAuthor() && isValidId(configId);
     }
+
+    // =========================================================================
+    // 5. Reader Subscribers & VoiceBook Author Waitlist (archive_subscribers)
+    // =========================================================================
+    match /archive_subscribers/{subscriberId} {
+      // PII Protection: Only the verified author can read or list subscriber emails
+      allow get: if isVerifiedAuthor() && isValidId(subscriberId);
+      allow list: if isVerifiedAuthor();
+
+      // Public readers/authors/investors can submit their own waitlist entry once (immutable create)
+      allow create: if isValidId(subscriberId)
+        && isValidArchiveSubscriber(incoming(), subscriberId)
+        && incoming().createdAt == request.time;
+
+      allow update: if false;
+      allow delete: if isVerifiedAuthor() && isValidId(subscriberId);
+    }
+
+    // =========================================================================
+    // 6. VoiceBook Traction Telemetry (archive_metrics)
+    // =========================================================================
+    match /archive_metrics/{metricId} {
+      allow get: if isValidId(metricId)
+        && (resource == null || existing().isPublished == true || isVerifiedAuthor());
+
+      allow list: if (existing().isPublished == true) || isVerifiedAuthor();
+
+      allow create: if isVerifiedAuthor()
+        && isValidId(metricId)
+        && isValidArchiveMetrics(incoming(), metricId)
+        && incoming().updatedAt == request.time;
+
+      allow update: if isValidArchiveMetrics(incoming(), metricId)
+        && isVerifiedAuthor()
+        && isValidId(metricId)
+        && incoming().metricId == existing().metricId
+        && incoming().updatedAt == request.time
+        && incoming().diff(existing()).affectedKeys().hasOnly([
+          'totalInquiries', 'voiceNotesGenerated', 'whatsappCompanionSessions',
+          'dimensionsCompleted', 'subscriberCount', 'humanVerifiedChecks',
+          'isPublished', 'updatedAt'
+        ]);
+
+      allow delete: if isVerifiedAuthor() && isValidId(metricId);
+    }
   }
 }
+

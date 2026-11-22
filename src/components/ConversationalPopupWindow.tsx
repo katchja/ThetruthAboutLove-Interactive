@@ -12,6 +12,7 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import { ChatMessage, Source, ChatModelTier } from '../types';
+import { VoiceNotePlayerBubble, VoiceNoteRecorderButton } from './VoiceNoteControls';
 
 interface ConversationalPopupWindowProps {
   isOpen: boolean;
@@ -25,6 +26,7 @@ interface ConversationalPopupWindowProps {
   sources: Source[];
   chatModel?: ChatModelTier;
   onOpenSafetyModal?: () => void;
+  isRunaPage?: boolean;
 }
 
 export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps> = ({
@@ -39,6 +41,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
   sources,
   chatModel = 'gemini-3.1-flash-lite',
   onOpenSafetyModal,
+  isRunaPage = false,
 }) => {
   const [inputQuery, setInputQuery] = useState('');
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -73,7 +76,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
 
   const sampleQuestions = [
     'Why is love not an emotion, but a life force?',
-    'How does self-love emergy from a natural law like syntropy?',
+    'How does self-love emerge from a natural law like syntropy?',
     'What are the five dimensions of love?',
   ];
 
@@ -86,8 +89,12 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
       {!isOpen && (
         <button
           onClick={onToggle}
-          className="fixed bottom-5 right-5 z-40 px-5 py-3.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2.5 font-sans font-medium text-xs tracking-wide group cursor-pointer"
-          title="Ask Manuscript"
+          className={`fixed bottom-5 right-5 z-40 px-5 py-3.5 rounded-full text-white transition-all transform hover:scale-105 active:scale-95 flex items-center gap-2.5 font-sans font-medium text-xs tracking-wide group cursor-pointer ${
+            isRunaPage
+              ? 'runa-glass-btn runa-glass-black'
+              : 'bg-[#C83E0B] hover:bg-[#A93207]'
+          }`}
+          title="Ask Manuscript (Written & Voice Notes)"
         >
           <div className="w-5 h-5 rounded-full bg-white/20 flex items-center justify-center shrink-0">
             <Heart className="w-3.5 h-3.5 text-white fill-white" />
@@ -102,19 +109,29 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
       )}
 
       {isOpen && (
-        <div className="fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-[95vw] sm:w-[520px] h-[680px] max-h-[88vh] rounded-3xl bg-[#F8F9FA] flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div
+          className={`fixed bottom-4 right-4 sm:bottom-6 sm:right-6 z-50 w-[95vw] sm:w-[520px] h-[680px] max-h-[88vh] rounded-3xl flex flex-col overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-200 ${
+            isRunaPage
+              ? 'bg-[#F8F9FA] border-0'
+              : 'bg-[#F8F9FA] shadow-2xl border border-[#E8EAED]'
+          }`}
+        >
           {/* Header */}
           <div className="bg-[#FFFFFF] text-[#0B0B0C] px-5 py-4 flex items-center justify-between shrink-0">
             <div className="flex items-center gap-3 min-w-0">
-              <div className="w-9 h-9 rounded-xl bg-[#0B0B0C] flex items-center justify-center shrink-0">
-                <Heart className="w-4 h-4 text-white fill-white" />
+              <div
+                className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                  isRunaPage ? 'bg-[#00F0FF] text-[#0B0B0C]' : 'bg-[#0B0B0C] text-white'
+                }`}
+              >
+                <Heart className="w-4 h-4 fill-current" />
               </div>
               <div className="min-w-0">
                 <h3 className="font-display font-medium text-base text-[#0B0B0C] truncate">
-                  Conversational Manuscript
+                  Runa · Conversational Manuscript
                 </h3>
                 <p className="text-[11px] text-[#5F6368] truncate font-sans">
-                  The Truth About Love · Catalina Butnaru
+                  The Truth About Love · Short Chats &amp; Voice Notes
                 </p>
               </div>
             </div>
@@ -140,7 +157,11 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
 
               <button
                 onClick={onToggle}
-                className="p-1.5 rounded-full text-[#5F6368] hover:text-white hover:bg-[#C83E0B] transition-colors cursor-pointer"
+                className={`p-1.5 rounded-full text-[#5F6368] transition-colors cursor-pointer ${
+                  isRunaPage
+                    ? 'hover:text-white hover:bg-[#141413]'
+                    : 'hover:text-white hover:bg-[#C83E0B]'
+                }`}
                 title="Close"
               >
                 <X className="w-4 h-4" />
@@ -149,16 +170,28 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
           </div>
 
           {/* Subheader Status Bar (Locked to Free-Tier Gemini Flash-Lite) */}
-          <div className="bg-[#F1F3F4] px-5 py-2.5 flex items-center justify-between gap-2 text-[11px] font-mono text-[#5F6368] shrink-0">
+          <div
+            className={`px-5 py-2.5 flex items-center justify-between gap-2 text-[11px] font-mono text-[#5F6368] shrink-0 ${
+              isRunaPage ? 'bg-[#F4F5F8]' : 'bg-[#F1F3F4]'
+            }`}
+          >
             <div className="flex items-center gap-1.5 truncate">
-              <Sparkles className="w-3.5 h-3.5 text-[#C83E0B] shrink-0" />
-              <span className="text-[#0B0B0C] font-medium">Gemini Flash-Lite</span>
+              <Sparkles
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  isRunaPage ? 'text-[#0098A6]' : 'text-[#C83E0B]'
+                }`}
+              />
+              <span className="text-[#0B0B0C] font-medium">Short Chat + Voice Note</span>
               <span aria-hidden="true">·</span>
               <span>Safeguarded</span>
             </div>
 
             <div className="flex items-center gap-1.5 text-[11px] font-mono text-[#5F6368] truncate">
-              <ShieldCheck className="w-3.5 h-3.5 text-[#0B0B0C] shrink-0" />
+              <ShieldCheck
+                className={`w-3.5 h-3.5 shrink-0 ${
+                  isRunaPage ? 'text-[#0098A6]' : 'text-[#0B0B0C]'
+                }`}
+              />
               <span className="truncate">
                 {isOfflineMode ? 'Offline' : `${sources.length} Sources`}
               </span>
@@ -169,7 +202,11 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
           <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-[#F8F9FA]">
             {messages.length === 0 ? (
               <div className="h-full flex flex-col justify-center text-center space-y-4 px-2 py-4">
-                <div className="w-12 h-12 rounded-2xl bg-[#0B0B0C] text-white flex items-center justify-center mx-auto">
+                <div
+                  className={`w-12 h-12 rounded-2xl flex items-center justify-center mx-auto ${
+                    isRunaPage ? 'bg-[#00F0FF] text-[#0B0B0C]' : 'bg-[#0B0B0C] text-white'
+                  }`}
+                >
                   <Heart className="w-6 h-6 fill-current" />
                 </div>
                 <div className="space-y-1.5">
@@ -177,7 +214,7 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                     Ask The Truth About Love
                   </h4>
                   <p className="text-xs text-[#5F6368] leading-relaxed max-w-xs mx-auto font-sans">
-                    Explore the five dimensions of love and the interactive archive.
+                    Send a written question or record a voice note. Replies are concise conversational chats with playable audio.
                   </p>
                 </div>
 
@@ -190,10 +227,18 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                       <button
                         key={idx}
                         onClick={() => handleSampleClick(q)}
-                        className="p-2.5 rounded-xl bg-[#FFFFFF] hover:bg-[#C83E0B] text-xs text-[#0B0B0C] hover:text-white transition-all flex items-center justify-between group cursor-pointer"
+                        className={`p-2.5 rounded-xl text-xs text-[#0B0B0C] transition-all flex items-center justify-between group cursor-pointer ${
+                          isRunaPage
+                            ? 'runa-glass-btn runa-glass-pill hover:text-[#0B0B0C]'
+                            : 'bg-[#FFFFFF] hover:bg-[#C83E0B] hover:text-white'
+                        }`}
                       >
                         <span className="line-clamp-1">{q}</span>
-                        <ArrowRight className="w-3 h-3 text-[#5F6368] group-hover:text-white group-hover:translate-x-0.5 transition-all shrink-0 ml-2" />
+                        <ArrowRight
+                          className={`w-3 h-3 text-[#5F6368] group-hover:translate-x-0.5 transition-all shrink-0 ml-2 ${
+                            isRunaPage ? 'group-hover:text-[#0B0B0C]' : 'group-hover:text-white'
+                          }`}
+                        />
                       </button>
                     ))}
                   </div>
@@ -208,21 +253,31 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                   }`}
                 >
                   <div
-                    className={`max-w-[90%] rounded-2xl p-3.5 text-xs leading-relaxed font-sans ${
+                    className={`max-w-[92%] rounded-2xl p-3.5 text-xs leading-relaxed font-sans ${
                       message.role === 'user'
-                        ? 'bg-[#0B0B0C] text-white rounded-tr-sm font-normal'
+                        ? isRunaPage
+                          ? 'bg-[#00F0FF]/20 text-[#0B0B0C] rounded-tr-sm font-normal'
+                          : 'bg-[#0B0B0C] text-white rounded-tr-sm font-normal'
                         : 'bg-[#FFFFFF] rounded-tl-sm text-[#0B0B0C]'
                     }`}
                   >
                     {message.role === 'assistant' && (
                       <div className="flex items-center justify-between gap-2 mb-2 pb-2 text-[10px] text-[#5F6368]">
                         <div className="flex items-center gap-2 font-mono font-medium text-[#0B0B0C]">
-                          <div className="w-6 h-6 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
-                            <Heart className="w-3 h-3 text-white fill-white" />
+                          <div
+                            className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                              isRunaPage ? 'bg-[#00F0FF] text-[#0B0B0C]' : 'bg-[#0B0B0C] text-white'
+                            }`}
+                          >
+                            <Heart className="w-3 h-3 fill-current" />
                           </div>
                           {message.guardrailCategory && message.guardrailCategory !== 'safe' ? (
                             <>
-                              <ShieldCheck className="w-3 h-3 text-[#C83E0B]" />
+                              <ShieldCheck
+                                className={`w-3 h-3 ${
+                                  isRunaPage ? 'text-[#0098A6]' : 'text-[#C83E0B]'
+                                }`}
+                              />
                               <span>Safety Guardrail Notice</span>
                             </>
                           ) : (
@@ -242,6 +297,17 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
 
                     <div className="whitespace-pre-wrap">{message.content}</div>
 
+                    {message.role === 'assistant' && (
+                      <div className="mt-3">
+                        <VoiceNotePlayerBubble
+                          text={message.content}
+                          initialAudioDataUrl={message.audioDataUrl}
+                          variant={isRunaPage ? 'runa' : 'compact'}
+                          label="Play Voice Note"
+                        />
+                      </div>
+                    )}
+
                     {message.role === 'assistant' &&
                       message.citations &&
                       message.citations.length > 0 && (
@@ -259,7 +325,11 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                                   );
                                   if (s && onSelectSource) onSelectSource(s);
                                 }}
-                                className="px-2.5 py-0.5 rounded-full bg-[#F1F3F4] text-[#0B0B0C] text-[10px] font-mono hover:bg-[#C83E0B] hover:text-white transition-colors truncate max-w-[200px] cursor-pointer"
+                                className={`px-2.5 py-0.5 rounded-full text-[#0B0B0C] text-[10px] font-mono transition-colors truncate max-w-[200px] cursor-pointer ${
+                                  isRunaPage
+                                    ? 'runa-glass-btn runa-glass-pill hover:text-[#0B0B0C]'
+                                    : 'bg-[#F1F3F4] hover:bg-[#C83E0B] hover:text-white'
+                                }`}
                                 title={`View ${c.sourceTitle}`}
                               >
                                 [{c.index}] {c.sourceTitle}
@@ -291,8 +361,12 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
 
             {isChatLoading && (
               <div className="flex items-center gap-2.5 p-3 rounded-2xl bg-[#FFFFFF] text-xs text-[#0B0B0C] max-w-[80%]">
-                <div className="w-6 h-6 rounded-lg bg-[#0B0B0C] flex items-center justify-center shrink-0">
-                  <Heart className="w-3 h-3 text-white fill-white animate-pulse" />
+                <div
+                  className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${
+                    isRunaPage ? 'bg-[#00F0FF] text-[#0B0B0C]' : 'bg-[#0B0B0C] text-white'
+                  }`}
+                >
+                  <Heart className="w-3 h-3 fill-current animate-pulse" />
                 </div>
                 <span>Catalina is contemplating your question...</span>
               </div>
@@ -301,37 +375,48 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Footer */}
+          {/* Input Footer: Written + Voice Note Mic */}
           <form
             onSubmit={handleSubmit}
-            className="p-3 bg-[#F1F3F4] shrink-0 space-y-2"
+            className={`p-3 shrink-0 space-y-2 ${
+              isRunaPage ? 'bg-[#F4F5F8]' : 'bg-[#F1F3F4]'
+            }`}
           >
-            <div className="relative flex items-center">
-              <input
-                ref={inputRef}
-                type="text"
-                value={inputQuery}
-                onChange={(e) => setInputQuery(e.target.value)}
-                placeholder="Ask anything and press Enter..."
-                disabled={isChatLoading}
-                className="w-full pl-4 pr-20 py-2.5 rounded-full bg-[#FFFFFF] text-xs text-[#0B0B0C] placeholder-[#80868B] focus:outline-none disabled:opacity-50 font-sans"
-              />
-              <div className="absolute right-2 flex items-center gap-1">
-                {inputQuery.trim() ? (
+            <div className="flex items-center gap-1.5">
+              <div className="relative flex-1 flex items-center">
+                <input
+                  ref={inputRef}
+                  type="text"
+                  value={inputQuery}
+                  onChange={(e) => setInputQuery(e.target.value)}
+                  placeholder="Write a message or use Voice Note..."
+                  disabled={isChatLoading}
+                  className="w-full pl-4 pr-10 py-2.5 rounded-full bg-[#FFFFFF] text-xs text-[#0B0B0C] placeholder-[#80868B] focus:outline-none disabled:opacity-50 font-sans"
+                />
+                {inputQuery.trim() && (
                   <button
                     type="submit"
                     disabled={isChatLoading}
-                    className="p-1.5 rounded-full bg-[#C83E0B] hover:bg-[#A93207] text-white transition-colors cursor-pointer"
+                    className={`absolute right-1.5 p-1.5 rounded-full transition-colors cursor-pointer ${
+                      isRunaPage
+                        ? 'runa-glass-btn runa-glass-black text-white'
+                        : 'bg-[#C83E0B] hover:bg-[#A93207] text-white'
+                    }`}
                     title="Send message"
                   >
                     <Send className="w-3.5 h-3.5" />
                   </button>
-                ) : (
-                  <span className="text-[10px] font-mono text-[#5F6368] bg-[#F1F3F4] px-2 py-0.5 rounded-full pointer-events-none">
-                    ↵ Enter
-                  </span>
                 )}
               </div>
+
+              <VoiceNoteRecorderButton
+                compact
+                accentTheme={isRunaPage ? 'runa' : 'default'}
+                disabled={isChatLoading}
+                onTranscriptReady={(transcript) => {
+                  onSendMessage(transcript);
+                }}
+              />
             </div>
 
             {/* Subtle Inline Fair AI Disclosure & Wellbeing Notice */}
@@ -343,7 +428,11 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
                 <button
                   type="button"
                   onClick={onOpenSafetyModal}
-                  className="text-[#C83E0B] hover:text-[#A93207] font-medium underline underline-offset-2 shrink-0 cursor-pointer"
+                  className={`font-medium underline underline-offset-2 shrink-0 cursor-pointer ${
+                    isRunaPage
+                      ? 'text-[#0098A6] hover:text-[#0B0B0C]'
+                      : 'text-[#C83E0B] hover:text-[#A93207]'
+                  }`}
                 >
                   Safety &amp; Disclosure
                 </button>
@@ -355,3 +444,4 @@ export const ConversationalPopupWindow: React.FC<ConversationalPopupWindowProps>
     </>
   );
 };
+

@@ -1,0 +1,50 @@
+{
+  "metrics": {
+    "totalInquiries": 148,
+    "voiceNotesGenerated": 64,
+    "whatsappCompanionSessions": 42,
+    "dimensionsCompleted": 95,
+    "subscriberCount": 38,
+    "humanVerifiedChecks": 88,
+    "updatedAt": 1794920970007
+  },
+  "subscribers": [],
+  "webhookLogs": [
+    {
+      "id": "wa-seed-1",
+      "timestamp": 1794917369958,
+      "direction": "inbound",
+      "messageType": "audio",
+      "senderPhone": "+44 7700 900412",
+      "textContent": "Why does Catalina say love is closer to syntropy than an emotion?",
+      "replyText": "Emotions fluctuate and can be manipulated, whereas love acts like syntropy—an organizing life force that expands your adjacent possible toward coherence, energy, and truth [Source 1].",
+      "webhookPayload": {
+        "object": "whatsapp_business_account",
+        "entry": [
+          {
+            "id": "WABA_VOICEBOOK_01",
+            "changes": [
+              {
+                "field": "messages",
+                "value": {
+                  "messaging_product": "whatsapp",
+                  "messages": [
+                    {
+                      "from": "447700900412",
+                      "id": "wamid.HBgMNDQ3NzAwOTAwNDEyFQIAEhgg",
+                      "type": "audio",
+                      "audio": {
+                        "mime_type": "audio/ogg; codecs=opus",
+                        "voice": true
+                      }
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

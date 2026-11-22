@@ -405,6 +405,128 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "ArchiveSubscriber": {
+      "title": "ArchiveSubscriber",
+      "description": "Reader subscriber and VoiceBook Author SaaS beta waitlist signup record.",
+      "type": "object",
+      "properties": {
+        "subscriberId": {
+          "type": "string",
+          "description": "Deterministic or generated subscriber ID matching document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "description": "Subscriber email address.",
+          "minLength": 3,
+          "maxLength": 180
+        },
+        "name": {
+          "type": "string",
+          "description": "Optional reader or author name.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "whatsappOptIn": {
+          "type": "boolean",
+          "description": "Whether the subscriber opted into WhatsApp VoiceBook updates."
+        },
+        "whatsappPhone": {
+          "type": "string",
+          "description": "Optional WhatsApp E.164 phone number.",
+          "minLength": 5,
+          "maxLength": 32
+        },
+        "role": {
+          "type": "string",
+          "description": "Subscriber cohort classification.",
+          "enum": ["reader", "author", "investor"],
+          "minLength": 6,
+          "maxLength": 16
+        },
+        "publicationUrl": {
+          "type": "string",
+          "description": "Optional Substack or book URL for author beta applicants.",
+          "minLength": 1,
+          "maxLength": 512
+        },
+        "completedDimensions": {
+          "type": "number",
+          "description": "Count of completed dimensions in the 5-Dimension Reading Journey (0 to 5)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server signup timestamp."
+        }
+      },
+      "required": [
+        "subscriberId",
+        "email",
+        "whatsappOptIn",
+        "role",
+        "completedDimensions",
+        "createdAt"
+      ]
+    },
+    "ArchiveMetrics": {
+      "title": "ArchiveMetrics",
+      "description": "Publicly readable live traction telemetry for VoiceBook Investor Pitch & Author SaaS showcase.",
+      "type": "object",
+      "properties": {
+        "metricId": {
+          "type": "string",
+          "description": "Metric document identifier (global_traction).",
+          "minLength": 1,
+          "maxLength": 64,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "totalInquiries": {
+          "type": "number",
+          "description": "Cumulative grounded written & voice inquiries."
+        },
+        "voiceNotesGenerated": {
+          "type": "number",
+          "description": "Cumulative playable voice notes synthesized."
+        },
+        "whatsappCompanionSessions": {
+          "type": "number",
+          "description": "Cumulative WhatsApp companion & webhook interactions."
+        },
+        "dimensionsCompleted": {
+          "type": "number",
+          "description": "Cumulative 5-Dimension reading milestones completed."
+        },
+        "subscriberCount": {
+          "type": "number",
+          "description": "Cumulative reader & author waitlist signups."
+        },
+        "humanVerifiedChecks": {
+          "type": "number",
+          "description": "Cumulative Pangram human-authorship verifications."
+        },
+        "isPublished": {
+          "type": "boolean"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "metricId",
+        "totalInquiries",
+        "voiceNotesGenerated",
+        "whatsappCompanionSessions",
+        "dimensionsCompleted",
+        "subscriberCount",
+        "humanVerifiedChecks",
+        "isPublished",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -427,6 +549,15 @@
     "/archive_config/{configId}": {
       "schema": { "$ref": "#/entities/ArchiveConfig" },
       "description": "Global book metadata configuration."
+    },
+    "/archive_subscribers/{subscriberId}": {
+      "schema": { "$ref": "#/entities/ArchiveSubscriber" },
+      "description": "Reader subscribers and VoiceBook Author SaaS waitlist signups."
+    },
+    "/archive_metrics/{metricId}": {
+      "schema": { "$ref": "#/entities/ArchiveMetrics" },
+      "description": "Live traction telemetry for the VoiceBook Investor Pitch page."
     }
   }
 }
+

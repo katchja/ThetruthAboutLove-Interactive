@@ -2,9 +2,10 @@ import { sanitizeImageSrc } from '../utils/security';
 
 export type SourceType = 'chapter' | 'article' | 'note' | 'scan' | 'citation' | 'book';
 export type ArchiveSection = 'authored' | 'references';
-export type AppView = 'landing' | 'archive';
+export type AppView = 'landing' | 'archive' | 'pitch';
 
 export type ChatModelTier = 'gemini-3.1-flash-lite';
+
 
 export interface Source {
   id: string;
@@ -104,6 +105,42 @@ export interface ChatMessage {
   model?: string;
   isOffline?: boolean;
   guardrailCategory?: GuardrailCategory;
+  isVoiceNote?: boolean;
+  audioDataUrl?: string;
+}
+
+export interface TractionMetrics {
+  totalInquiries: number;
+  voiceNotesGenerated: number;
+  whatsappCompanionSessions: number;
+  dimensionsCompleted: number;
+  subscriberCount: number;
+  humanVerifiedChecks: number;
+  updatedAt: number;
+}
+
+export interface SubscriberRecord {
+  subscriberId: string;
+  email: string;
+  name?: string;
+  whatsappOptIn: boolean;
+  whatsappPhone?: string;
+  role: 'reader' | 'author' | 'investor';
+  publicationUrl?: string;
+  completedDimensions: number;
+  createdAt: number;
+}
+
+export interface WhatsAppWebhookEventLog {
+  id: string;
+  timestamp: number;
+  direction: 'inbound' | 'outbound';
+  messageType: 'text' | 'audio';
+  senderPhone: string;
+  textContent: string;
+  replyText?: string;
+  audioDataUrl?: string;
+  webhookPayload: Record<string, unknown>;
 }
 
 export interface StudioArtifact {
@@ -127,4 +164,5 @@ export interface BookMetadata {
   coverAccent: string;
   purchaseUrl?: string;
 }
+
 
